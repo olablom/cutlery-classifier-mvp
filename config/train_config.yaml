@@ -11,25 +11,27 @@ data:
   train_split: 0.7
   val_split: 0.2
   test_split: 0.1
+  grayscale: true # Using grayscale for efficiency
 
 # Model Configuration
 model:
   architecture: "resnet18" # Options: resnet18, mobilenet_v2
   pretrained: true
-  num_classes: 9 # 3 manufacturers x 3 cutlery types
+  num_classes: 3 # Type detection: fork, knife, spoon
   dropout_rate: 0.5
   freeze_backbone: false # Set to true for feature extraction only
+  input_channels: 1 # Grayscale input
 
 # Training Configuration
 training:
-  epochs: 10
+  epochs: 30
   learning_rate: 0.001
   weight_decay: 0.0001
   optimizer: "adam" # Options: adam, sgd
   scheduler: "step" # Options: step, cosine, plateau
-  step_size: 5
+  step_size: 10
   gamma: 0.1
-  early_stopping_patience: 5
+  early_stopping_patience: 8
   save_best_only: true
 
 # Data Augmentation
@@ -39,12 +41,12 @@ augmentation:
   color_jitter:
     brightness: 0.2
     contrast: 0.2
-    saturation: 0.2
-    hue: 0.1
+    saturation: 0.0 # Disabled for grayscale
+    hue: 0.0 # Disabled for grayscale
   gaussian_blur: 0.1
   normalize:
-    mean: [0.485, 0.456, 0.406] # ImageNet standards
-    std: [0.229, 0.224, 0.225]
+    mean: [0.449] # Grayscale ImageNet equivalent
+    std: [0.226]
 
 # Paths
 paths:
@@ -53,28 +55,34 @@ paths:
   results_dir: "results"
   logs_dir: "logs"
 
-# Class Names (update based on your manufacturers)
+# Class Names - Type Detection (Stage 1)
 classes:
-  - "manufacturer_a_knife"
-  - "manufacturer_a_fork"
-  - "manufacturer_a_spoon"
-  - "manufacturer_b_knife"
-  - "manufacturer_b_fork"
-  - "manufacturer_b_spoon"
-  - "manufacturer_c_knife"
-  - "manufacturer_c_fork"
-  - "manufacturer_c_spoon"
+  - "fork"
+  - "knife"
+  - "spoon"
+
+# Manufacturer Classes (for future Stage 2 models)
+manufacturers:
+  ikea:
+    - "ikea_fork"
+    - "ikea_knife"
+    - "ikea_spoon"
+  obh:
+    - "obh_fork"
+    - "obh_knife"
+    - "obh_spoon"
 
 # Evaluation
 evaluation:
   metrics: ["accuracy", "precision", "recall", "f1"]
   confusion_matrix: true
   grad_cam: true
+  grad_cam_samples: 10
   top_k: 3
 
 # Export Settings
 export:
-  formats: ["pt", "onnx"]
+  formats: ["pt", "onnx", "torchscript"]
   optimize_for_mobile: false
   quantization: false
 
@@ -84,6 +92,7 @@ logging:
   tensorboard: true
   save_plots: true
   plot_format: "png"
+  plot_dpi: 300
 
 # Hardware
 device: "auto" # Options: auto, cpu, cuda
