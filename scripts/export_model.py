@@ -234,6 +234,12 @@ def main():
         help="Custom name for exported model (default: use model filename)",
     )
     parser.add_argument(
+        "--version",
+        type=str,
+        default="v1",
+        help="Model version for filename (default: v1)",
+    )
+    parser.add_argument(
         "--optimize", action="store_true", help="Apply optimizations during export"
     )
     parser.add_argument(
@@ -308,7 +314,7 @@ def main():
         exported_files = []
 
         if args.format in ["onnx", "all"]:
-            onnx_path = output_dir / f"{model_name}.onnx"
+            onnx_path = output_dir / f"{model_name}_{args.version}.onnx"
 
             start_time = time.time()
             export_to_onnx(
@@ -328,7 +334,7 @@ def main():
                 test_exported_model(model, str(onnx_path), "onnx", input_size)
 
         if args.format in ["torchscript", "all"]:
-            ts_path = output_dir / f"{model_name}.pt"
+            ts_path = output_dir / f"{model_name}_{args.version}.pt"
 
             start_time = time.time()
             export_to_torchscript(
