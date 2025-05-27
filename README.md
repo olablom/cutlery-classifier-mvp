@@ -6,16 +6,39 @@ An AI-based cutlery classification system that can identify and sort cutlery (kn
 
 **Purpose**: Develop an AI system to classify washed cutlery by manufacturer, enabling automated sorting in commercial kitchen environments to ensure proper cutlery distribution and reduce manual labor.
 
-**Goal**: Create a working classification model using mobile phone images (30-50 per class) with at least 80% accuracy, exportable for production use with industrial cameras.
+**Goal**: Create a working hierarchical classification system using mobile phone images (30-50 per class) with at least 80% accuracy, optimized for embedded deployment with industrial cameras.
+
+## Project Scope
+
+### MVP Scope (Academic Project)
+
+This MVP demonstrates the core classification pipeline with:
+
+- **Type detection** (fork/knife/spoon) using grayscale ResNet18
+- **Proof-of-concept manufacturer classification** for forks
+- Complete training/evaluation/export pipeline
+- Modular architecture for easy expansion
+
+### Production Roadmap (Future Development)
+
+The modular architecture enables straightforward expansion to:
+
+- Full manufacturer models for all cutlery types (knife, spoon)
+- Real-time embedded deployment on ARM processors
+- Industrial global shutter camera integration
+- Advanced optimization techniques (quantization, pruning)
 
 ## Features
 
-- Multi-class classification (3 manufacturers × 3 cutlery types = 9 classes)
-- Mobile image training pipeline
+- **Hierarchical classification pipeline:**
+  - Type classification (fork/knife/spoon) using grayscale images
+  - Manufacturer classification for specific cutlery types
+- **Modular architecture** enabling independent model training and deployment
+- Mobile image training pipeline optimized for embedded systems
 - Model export capabilities (.pt and .onnx formats)
 - Grad-CAM visualization for model interpretability
 - Inference pipeline with GUI/CLI options
-- Production-ready model architecture
+- Production-ready model architecture with edge optimization
 
 ## Project Structure
 
@@ -34,6 +57,12 @@ cutlery-classifier-mvp/
 ├── src/
 │   ├── data/                   # Data loading and preprocessing
 │   ├── models/                 # Model architectures
+│   ├── pipeline/               # Classification pipeline components
+│   │   ├── type_detector.py    # Type classification (fork/knife/spoon)
+│   │   └── manufacturer/       # Manufacturer-specific models
+│   │       ├── fork_classifier.py    # Fork manufacturer classification
+│   │       ├── knife_classifier.py   # (Future development)
+│   │       └── spoon_classifier.py   # (Future development)
 │   ├── training/               # Training scripts and utilities
 │   ├── evaluation/             # Evaluation and metrics
 │   ├── inference/              # Inference pipeline
@@ -98,10 +127,25 @@ cutlery-classifier-mvp/
 
 ## Model Architecture
 
-The MVP uses transfer learning with pre-trained models:
+The MVP uses a hierarchical classification approach:
 
-- **Primary**: ResNet18 (lightweight, good performance)
-- **Alternative**: MobileNetV2 (optimized for mobile/edge deployment)
+### Type Detection (Stage 1)
+
+- **Model**: ResNet18 with grayscale input (1 channel)
+- **Classes**: 3 (fork, knife, spoon)
+- **Purpose**: Fast, accurate type classification
+
+### Manufacturer Classification (Stage 2)
+
+- **Model**: MobileNetV2 (optimized for edge deployment)
+- **Implementation**: Separate model per cutlery type
+- **MVP Scope**: Fork classifier only (proof-of-concept)
+
+### Pipeline Flow
+
+```
+Input Image → Grayscale → Type Detector → Load Specific Model → Manufacturer Prediction
+```
 
 ## Data Collection Guidelines
 
