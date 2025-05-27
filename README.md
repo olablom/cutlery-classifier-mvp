@@ -34,10 +34,12 @@ The modular architecture enables straightforward expansion to:
   - Type classification (fork/knife/spoon) using grayscale images
   - Manufacturer classification for specific cutlery types
 - **Modular architecture** enabling independent model training and deployment
-- Mobile image training pipeline optimized for embedded systems
-- Model export capabilities (.pt and .onnx formats)
-- Grad-CAM visualization for model interpretability
-- Inference pipeline with GUI/CLI options
+- **Complete ML pipeline** with training, evaluation, inference, and export
+- **Visual inference** with prediction overlays and confidence scores
+- **Batch processing** for multiple images
+- **Model export** to ONNX and TorchScript formats
+- **Grad-CAM visualization** for model interpretability
+- **CLI interfaces** for all major operations
 - Production-ready model architecture with edge optimization
 
 ## Project Structure
@@ -75,7 +77,8 @@ cutlery-classifier-mvp/
 ├── results/
 │   ├── plots/                  # Training plots and visualizations
 │   ├── metrics/                # Performance metrics
-│   └── confusion_matrices/     # Confusion matrix outputs
+│   ├── confusion_matrices/     # Confusion matrix outputs
+│   └── grad_cam/               # Grad-CAM visualizations
 ├── config/                     # Configuration files
 ├── tests/                      # Unit tests
 ├── scripts/                    # Utility scripts
@@ -85,45 +88,118 @@ cutlery-classifier-mvp/
 ## Requirements
 
 - Python 3.8+
-- PyTorch
+- PyTorch 2.0+
 - torchvision
 - OpenCV
-- PIL
+- PIL/Pillow
 - NumPy
 - Matplotlib
 - scikit-learn
+- ONNX (for model export)
+- Grad-CAM (for interpretability)
 
 ## Quick Start
 
-1. **Clone the repository**
+1. **Clone and setup**
 
    ```bash
    git clone <repository-url>
    cd cutlery-classifier-mvp
-   ```
-
-2. **Install dependencies**
-
-   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Prepare your data**
-
-   - Place images in `data/raw/manufacturer_x/cutlery_type/`
-   - Ensure at least 30 images per class
-   - Recommended image size: 320x320 pixels
-
-4. **Train the model**
+2. **Prepare your data**
 
    ```bash
-   python scripts/train.py --config config/train_config.yaml
+   # Place images in data/raw/manufacturer_x/cutlery_type/
+   # Validate dataset
+   python scripts/validate_dataset.py
+
+   # Create train/val/test splits
+   python scripts/prepare_dataset.py --create-splits
+   ```
+
+3. **Train the model**
+
+   ```bash
+   # Train type detector (fork/knife/spoon)
+   python scripts/train_type_detector.py --epochs 30 --batch-size 32
+   ```
+
+4. **Evaluate the model**
+
+   ```bash
+   # Comprehensive evaluation with Grad-CAM
+   python scripts/evaluate_model.py --model models/checkpoints/type_detector_best.pth
    ```
 
 5. **Run inference**
+
    ```bash
-   python scripts/inference.py --model models/exports/best_model.pt --image path/to/test/image.jpg
+   # Basic inference
+   python scripts/infer_image.py --model models/checkpoints/type_detector_best.pth --image test.jpg
+
+   # With visualization
+   python scripts/infer_image.py --model models/checkpoints/type_detector_best.pth --image test.jpg --visualize --output result.jpg
    ```
+
+6. **Export for deployment**
+
+   ```bash
+   # Export to ONNX
+   python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format onnx
+   ```
+
+## Usage Examples
+
+### Training
+
+```bash
+# Train with custom parameters
+python scripts/train_type_detector.py --epochs 50 --batch-size 16 --learning-rate 0.0005
+
+# Resume from checkpoint
+python scripts/train_type_detector.py --resume models/checkpoints/type_detector_latest.pth
+```
+
+### Evaluation
+
+```bash
+# Full evaluation with 20 Grad-CAM samples
+python scripts/evaluate_model.py --model models/checkpoints/type_detector_best.pth --samples 20
+
+# Custom evaluation name
+python scripts/evaluate_model.py --model models/checkpoints/type_detector_best.pth --name "final_evaluation"
+```
+
+### Inference
+
+```bash
+# Single image with top-3 predictions
+python scripts/infer_image.py --model models/checkpoints/type_detector_best.pth --image test.jpg --top-k 3
+
+# Batch processing with visualizations
+python scripts/infer_image.py --model models/checkpoints/type_detector_best.pth --batch data/test_images/ --visualize --output results/
+
+# Show model information
+python scripts/infer_image.py --model models/checkpoints/type_detector_best.pth --image test.jpg --info
+
+# Save results as JSON
+python scripts/infer_image.py --model models/checkpoints/type_detector_best.pth --image test.jpg --json results.json
+```
+
+### Model Export
+
+```bash
+# Export to ONNX with optimization
+python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format onnx --optimize
+
+# Export to both ONNX and TorchScript
+python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format all
+
+# Export with testing
+python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format onnx --test
+```
 
 ## Model Architecture
 
@@ -133,11 +209,13 @@ The MVP uses a hierarchical classification approach:
 
 - **Model**: ResNet18 with grayscale input (1 channel)
 - **Classes**: 3 (fork, knife, spoon)
+- **Parameters**: ~11.2M
 - **Purpose**: Fast, accurate type classification
 
 ### Manufacturer Classification (Stage 2)
 
 - **Model**: MobileNetV2 (optimized for edge deployment)
+- **Parameters**: ~2.2M per model
 - **Implementation**: Separate model per cutlery type
 - **MVP Scope**: Fork classifier only (proof-of-concept)
 
@@ -154,18 +232,34 @@ Input Image → Grayscale → Type Detector → Load Specific Model → Manufact
 - **Background**: Varied backgrounds to improve generalization
 - **Lighting**: Different lighting conditions
 - **Format**: JPEG, PNG supported
+- **Target**: 40 images per class (minimum 20)
 
 ## Performance Targets
 
 - **Accuracy**: ≥80% on validation set
 - **Inference Speed**: <100ms per image
 - **Model Size**: <50MB for deployment
+- **Memory Usage**: <2GB VRAM for training
 
 ## Export Formats
 
-- **PyTorch (.pt)**: For Python deployment
-- **ONNX (.onnx)**: For cross-platform deployment
-- **TorchScript**: For C++ integration
+- **PyTorch (.pth)**: Training checkpoints with full state
+- **ONNX (.onnx)**: Cross-platform deployment
+- **TorchScript (.pt)**: PyTorch mobile and C++ integration
+
+## Hardware Requirements
+
+### Training
+
+- **GPU**: RTX 3050 or better (8GB+ VRAM recommended)
+- **RAM**: 16GB+ system memory
+- **Storage**: 10GB+ free space
+
+### Inference
+
+- **CPU**: Any modern processor
+- **GPU**: Optional (CUDA-capable for acceleration)
+- **RAM**: 4GB+ system memory
 
 ## Future Development
 
