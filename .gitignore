@@ -160,17 +160,12 @@ cython_debug/
 #  https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 .idea/
 
-# Data files
+# Project specific data
+data/raw/
 data/processed/
 data/augmented/
-*.csv
-*.json
-*.pkl
-*.pickle
-*.h5
-*.hdf5
 
-# Model files
+# Model files and checkpoints
 models/checkpoints/
 models/exports/
 *.pt
@@ -180,82 +175,43 @@ models/exports/
 *.tflite
 *.h5
 
-# Training logs and results
-logs/
-runs/
+# Results and logs
 results/
-experiments/
+logs/
+*.log
 wandb/
 mlruns/
 .tensorboard/
 
-# Image files (uncomment if you don't want to track images)
-# *.jpg
-# *.jpeg
-# *.png
-# *.gif
-# *.bmp
-# *.tiff
-# *.webp
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.webp
 
-# Video files
-*.mp4
-*.avi
-*.mov
-*.mkv
+# Large data files
+*.csv
+*.json
+*.pkl
+*.pickle
+*.h5
+*.hdf5
 
-# Demo and test files
-demo_images/
-test_images/
-temp_images/
-
-# Temporary files
-*.tmp
-*.temp
-*~
-
-# OS specific
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Environment variables and secrets
+.env
+*.key
+secrets.yaml
+config/secrets.yaml
 
 # IDE specific
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# CUDA
-*.cu.o
-*.cu.cache
-
-# PyTorch specific
-lightning_logs/
-checkpoints/
-
-# Weights & Biases
-wandb/
-
-# MLflow
-mlruns/
-
-# DVC
-.dvc/
-.dvcignore
-
-# Large files (adjust as needed)
-*.zip
-*.tar.gz
-*.rar
-*.7z
-
-# Configuration files with sensitive data
-config/secrets.yaml
-config/local_config.yaml
-.env.local
-.env.production 
+# OS specific
+.DS_Store
+Thumbs.db 
