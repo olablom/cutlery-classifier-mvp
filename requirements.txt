@@ -24,6 +24,10 @@ tqdm==4.67.1
 # Logging / utils
 PyYAML==6.0.2
 
+# Optional: for data augmentation (diffusion)
+diffusers==0.28.0
+
+
 # GradCAM (compatible with Torch Nightly)
 git+https://github.com/jacobgil/pytorch-grad-cam.git@master
 

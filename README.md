@@ -138,6 +138,21 @@ cutlery-classifier-mvp/
 | Inference Time | <200ms |
 | Memory Usage   | <512MB |
 
+## Data Augmentation
+
+This project uses Stable Diffusion v1.5 (image-to-image pipeline) for advanced data augmentation.
+
+Key points:
+
+- Model: `runwayml/stable-diffusion-v1-5`
+- Augmentation script: `src/augment/generate_diffusion_images.py`
+- Safety checker: disabled for reproducible training data (MVP mode)
+- Augmentation CLI example:
+
+```bash
+python src/augment/generate_diffusion_images.py --classes fork knife spoon
+
+
 ## License
 
 MIT License - See LICENSE file for details.
@@ -146,3 +161,4 @@ MIT License - See LICENSE file for details.
 
 - ResNet architecture: [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
 - Grad-CAM visualization: [Grad-CAM: Visual Explanations from Deep Networks](https://arxiv.org/abs/1610.02391)
+```
