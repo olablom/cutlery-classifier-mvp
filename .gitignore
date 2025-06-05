@@ -78,6 +78,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+notebooks/
 
 # IPython
 profile_default/
@@ -164,19 +165,17 @@ cython_debug/
 data/raw/
 data/processed/
 data/augmented/
+demo_images/
 
 # Internal documentation and guides
 docs/fotograferingsguide.md
 
 # Model files and checkpoints
-models/checkpoints/
 models/exports/
 *.pt
 *.pth
 *.onnx
-*.pb
-*.tflite
-*.h5
+!models/checkpoints/best_model.pt
 
 # Results and logs
 results/
@@ -186,22 +185,15 @@ wandb/
 mlruns/
 .tensorboard/
 
-# Image files
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.tiff
-*.webp
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Large data files
-*.csv
-*.json
-*.pkl
-*.pickle
-*.h5
-*.hdf5
+# Experiment tracking
+experiments/
+temp/
 
 # Environment variables and secrets
 .env
