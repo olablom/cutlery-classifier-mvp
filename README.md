@@ -113,11 +113,11 @@ cutlery-classifier-mvp/
 
 ## 📊 Performance Metrics
 
-| Metric         | Value              |
-| -------------- | ------------------ |
-| Accuracy       | 100.0%             |
-| Inference Time | <200ms on RTX 5090 |
-| Memory Usage   | <512MB             |
+| Metric         | Value                                   |
+| -------------- | --------------------------------------- |
+| Accuracy       | ~25% (current MVP — retraining planned) |
+| Inference Time | <200ms on RTX 5090                      |
+| Memory Usage   | <512MB                                  |
 
 ## 🔄 Data Augmentation
 
