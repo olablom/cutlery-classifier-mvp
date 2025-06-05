@@ -25,6 +25,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 
 # Configure logging
@@ -132,8 +133,12 @@ def generate_grad_cam(
     model.requires_grad_(True)
     cam = GradCAM(model=model, target_layers=[target_layer])
 
+    # Set target class for GradCAM
+    target_class_idx = ["fork", "knife", "spoon"].index(pred_label)
+    targets = [ClassifierOutputTarget(target_class_idx)]
+
     # Generate CAM
-    grayscale_cam = cam(input_tensor=input_tensor)
+    grayscale_cam = cam(input_tensor=input_tensor, targets=targets)
 
     # Load and preprocess original image for visualization
     rgb_img = Image.open(image_path).convert("RGB")
