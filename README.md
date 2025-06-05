@@ -53,67 +53,48 @@ cp env.example .env
 nano .env
 ```
 
-## Running Inference
+## ⚠️ Datasets Disclaimer
 
-The model classifies individual cutlery images into three categories: fork, knife, or spoon.
+This repository does not include training or test datasets to keep the repo lightweight.  
+Please provide your own dataset under:
 
-### Basic Inference
+- `data/raw/` → original photos
+- `data/processed/` → preprocessed dataset for training and testing
+- `data/augmented/` → (optional) diffusion-augmented dataset
 
-To run inference on a single image:
+See the "Data Preparation" section for guidance on collecting and preprocessing your own dataset.
 
-```bash
-python scripts/run_inference.py --device cuda --image "data/processed/test/fork/IMG_0941[1].jpg"
-```
+## 🔍 Inference and Testing
 
-Example output:
-
-```
-INFO - Using device: cuda
-INFO - Model loaded successfully
-INFO - Prediction Results:
-INFO - Predicted class: fork
-INFO - Class probabilities:
-INFO - fork: 1.0000
-INFO - knife: 0.0000
-INFO - spoon: 0.0000
-```
-
-### Grad-CAM Visualization
-
-To understand which parts of the image influenced the model's decision, you can generate a Grad-CAM visualization:
+### Run inference on a single image:
 
 ```bash
-python scripts/run_inference.py --device cuda --image "data/processed/test/fork/IMG_0941[1].jpg" --grad-cam
+python scripts/run_inference.py --device cuda --image path/to/image.jpg --grad-cam
 ```
 
-This will:
+### Run full dataset test with per-class accuracy:
 
-1. Run normal inference and show predictions
-2. Generate a heatmap visualization highlighting important regions
-3. Save the visualization to: `results/grad_cam_{class}_{timestamp}.jpg`
-
-Example output with Grad-CAM:
-
-```
-INFO - Using device: cuda
-INFO - Model loaded successfully
-INFO - Prediction Results:
-INFO - Predicted class: fork
-INFO - Class probabilities:
-INFO - fork: 1.0000
-INFO - knife: 0.0000
-INFO - spoon: 0.0000
-INFO - Generating Grad-CAM visualization...
-INFO - Grad-CAM visualization saved to: results/grad_cam_fork_20240315_143022.jpg
+```bash
+python scripts/test_dataset_inference.py --device cuda --test_dir data/processed/test --save-misclassified
 ```
 
-## Project Structure
+Results will be saved in `results/misclassified_grad_cam/` if there are misclassified images.
+
+A detailed test report template is available in `docs/test_report_template.md`. Use this template to document your test results and model performance.
+
+Note: Since datasets are not included in the repository, you'll need to:
+
+1. Collect your own cutlery images
+2. Process them using the data preparation pipeline
+3. Or use the provided data augmentation script to generate synthetic training data
+
+## 📁 Project Structure
 
 ```
 cutlery-classifier-mvp/
 ├── data/                    # Dataset directory
 │   ├── processed/          # Processed datasets
-│   └── test/              # Test images
+│   └── augmented/         # Augmented datasets
 ├── models/                 # Model files
 │   └── checkpoints/       # Training checkpoints
 ├── results/               # Results and analysis
@@ -130,15 +111,15 @@ cutlery-classifier-mvp/
 └── tests/               # Test suite
 ```
 
-## Performance Metrics
+## 📊 Performance Metrics
 
-| Metric         | Value  |
-| -------------- | ------ |
-| Accuracy       | 98.5%  |
-| Inference Time | <200ms |
-| Memory Usage   | <512MB |
+| Metric         | Value              |
+| -------------- | ------------------ |
+| Accuracy       | 100.0%             |
+| Inference Time | <200ms on RTX 5090 |
+| Memory Usage   | <512MB             |
 
-## Data Augmentation
+## 🔄 Data Augmentation
 
 This project uses Stable Diffusion v1.5 (image-to-image pipeline) for advanced data augmentation.
 
@@ -151,14 +132,17 @@ Key points:
 
 ```bash
 python src/augment/generate_diffusion_images.py --classes fork knife spoon
+```
 
-
-## License
+## 📜 License
 
 MIT License - See LICENSE file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - ResNet architecture: [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
 - Grad-CAM visualization: [Grad-CAM: Visual Explanations from Deep Networks](https://arxiv.org/abs/1610.02391)
+
+```
+
 ```
