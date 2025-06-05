@@ -126,6 +126,7 @@ def generate_grad_cam(
 
     image = Image.open(image_path)
     input_tensor = transform(image).unsqueeze(0).to(device)
+    input_tensor.requires_grad_()
 
     # Configure GradCAM
     target_layer = model.layer4[-1]
@@ -138,7 +139,8 @@ def generate_grad_cam(
     targets = [ClassifierOutputTarget(target_class_idx)]
 
     # Generate CAM
-    grayscale_cam = cam(input_tensor=input_tensor, targets=targets)
+    with torch.enable_grad():
+        grayscale_cam = cam(input_tensor=input_tensor, targets=targets)
 
     # Load and preprocess original image for visualization
     rgb_img = Image.open(image_path).convert("RGB")
