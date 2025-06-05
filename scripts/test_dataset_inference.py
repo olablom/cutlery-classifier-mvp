@@ -128,6 +128,8 @@ def generate_grad_cam(
 
     # Configure GradCAM
     target_layer = model.layer4[-1]
+    model.eval()
+    model.requires_grad_(True)
     cam = GradCAM(model=model, target_layers=[target_layer])
 
     # Generate CAM
