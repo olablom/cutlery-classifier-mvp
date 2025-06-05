@@ -165,6 +165,9 @@ data/raw/
 data/processed/
 data/augmented/
 
+# Internal documentation and guides
+docs/fotograferingsguide.md
+
 # Model files and checkpoints
 models/checkpoints/
 models/exports/

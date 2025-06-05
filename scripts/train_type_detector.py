@@ -16,12 +16,119 @@ import logging
 import yaml
 from pathlib import Path
 import sys
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from sklearn.metrics import confusion_matrix, classification_report
+import torch
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.training.trainer import CutleryTrainer
+from src.evaluation.evaluator import CutleryEvaluator
+
+# Setup logging
+logger = logging.getLogger(__name__)
+
+
+def plot_training_history(history, save_dir):
+    """Plot training history and save figures."""
+    if not history:
+        logger.warning("No training history provided, skipping plot generation")
+        return
+
+    # Create plots directory if it doesn't exist
+    plots_dir = Path(save_dir)
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Plot training and validation loss
+    plt.figure(figsize=(10, 5))
+    plt.plot(history["train_losses"], label="Training Loss")
+    plt.plot(history["val_losses"], label="Validation Loss")
+    plt.title("Training and Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(plots_dir / "loss_history.png")
+    plt.close()
+
+    # Plot training and validation accuracy
+    plt.figure(figsize=(10, 5))
+    plt.plot(history["train_accs"], label="Training Accuracy")
+    plt.plot(history["val_accs"], label="Validation Accuracy")
+    plt.title("Training and Validation Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy (%)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(plots_dir / "accuracy_history.png")
+    plt.close()
+
+    logger.info(f"Training plots saved in: {plots_dir}")
+
+
+def plot_confusion_matrix(y_true, y_pred, class_names, save_path):
+    """Create and save confusion matrix plot."""
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=class_names,
+        yticklabels=class_names,
+    )
+    plt.title("Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.savefig(save_path)
+    plt.close()
+
+
+def evaluate_model(trainer, test_loader, save_dir):
+    """Evaluate model on test set and save results."""
+    device = trainer.device
+    model = trainer.model
+    class_names = trainer.class_names
+
+    # Switch to evaluation mode
+    model.eval()
+
+    all_preds = []
+    all_labels = []
+
+    logging.info("Evaluating model on test set...")
+
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images = images.to(device)
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.numpy())
+
+    # Calculate metrics
+    report = classification_report(
+        all_labels, all_preds, target_names=class_names, output_dict=True
+    )
+
+    # Save classification report
+    report_path = Path(save_dir) / "test_results.txt"
+    with open(report_path, "w") as f:
+        f.write("Test Set Evaluation Results\n")
+        f.write("==========================\n\n")
+        f.write(classification_report(all_labels, all_preds, target_names=class_names))
+
+    # Plot confusion matrix
+    cm_path = Path(save_dir) / "confusion_matrix.png"
+    plot_confusion_matrix(all_labels, all_preds, class_names, cm_path)
+
+    return report
 
 
 def load_config(config_path: str) -> dict:
@@ -99,6 +206,11 @@ def main():
     parser.add_argument(
         "--resume", type=str, default=None, help="Path to checkpoint to resume from"
     )
+    parser.add_argument(
+        "--mixed-data",
+        action="store_true",
+        help="Include mixed cutlery images in training",
+    )
 
     args = parser.parse_args()
 
@@ -166,14 +278,25 @@ def main():
 
     try:
         # Create dataloaders
-        train_loader, val_loader, test_loader = trainer.create_dataloaders()
+        train_loader, val_loader, test_loader = trainer.create_dataloaders(
+            include_mixed=args.mixed_data
+        )
 
         # Start training
         logger.info("Starting training...")
-        trainer.train(train_loader, val_loader)
+        history = trainer.train(train_loader, val_loader)
 
         logger.info("Training completed successfully!")
         logger.info(f"Best validation accuracy: {trainer.best_val_acc:.2f}%")
+
+        # Plot training history
+        logger.info("Generating training plots...")
+        plot_training_history(history, project_root / "results" / "plots")
+
+        # Evaluate on test set
+        logger.info("Evaluating model on test set...")
+        results_dir = project_root / "results"
+        test_results = evaluate_model(trainer, test_loader, results_dir)
 
         # Save final model info
         model_info_path = project_root / "models" / "type_detector_info.txt"
@@ -183,10 +306,19 @@ def main():
             f.write(f"Architecture: {config['model']['architecture']}\n")
             f.write(f"Classes: {trainer.class_names}\n")
             f.write(f"Best Validation Accuracy: {trainer.best_val_acc:.2f}%\n")
+            f.write(f"Test Set Accuracy: {test_results['accuracy']:.2f}%\n")
             f.write(f"Total Epochs: {trainer.current_epoch + 1}\n")
             f.write(f"Device: {trainer.device}\n")
+            f.write(f"\nPer-Class Test Metrics:\n")
+            for class_name in trainer.class_names:
+                metrics = test_results[class_name]
+                f.write(f"\n{class_name}:\n")
+                f.write(f"  Precision: {metrics['precision']:.3f}\n")
+                f.write(f"  Recall: {metrics['recall']:.3f}\n")
+                f.write(f"  F1-Score: {metrics['f1-score']:.3f}\n")
 
         logger.info(f"Model info saved: {model_info_path}")
+        logger.info("Training and evaluation completed!")
 
     except FileNotFoundError as e:
         logger.error(f"Data not found: {e}")

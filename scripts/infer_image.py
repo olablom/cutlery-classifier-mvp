@@ -25,12 +25,78 @@ import sys
 import json
 from pathlib import Path
 from typing import List
+from datetime import datetime
+import os
+import torch
+from PIL import Image
+import torchvision.transforms as transforms
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.inference.inferencer import CutleryInferencer
+from src.models.model_factory import create_model
+from src.utils.config import load_config
+
+# Setup logging
+log_dir = Path("results/logs")
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "inference.log"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
+)
+
+
+def setup_transforms():
+    """Setup image transforms for inference."""
+    return transforms.Compose(
+        [
+            transforms.Resize((320, 320)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485], std=[0.229]),
+        ]
+    )
+
+
+def load_model(model_path):
+    """Load the trained model."""
+    try:
+        config = load_config()
+        model = create_model(config)
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+        return model
+    except Exception as e:
+        logging.error(f"Error loading model: {str(e)}")
+        sys.exit(1)
+
+
+def predict_image(model, image_path, transform):
+    """
+    Predict class for a single image.
+
+    Returns:
+        tuple: (predicted_class, confidence)
+    """
+    try:
+        image = Image.open(image_path).convert("RGB")
+        image_tensor = transform(image).unsqueeze(0)
+
+        with torch.no_grad():
+            outputs = model(image_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            confidence, predicted = torch.max(probabilities, 1)
+
+        return predicted.item(), confidence.item()
+
+    except Exception as e:
+        logging.error(f"Error processing image {image_path}: {str(e)}")
+        return None, None
 
 
 def print_prediction_results(results: dict, show_details: bool = False):

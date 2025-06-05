@@ -1,0 +1,26 @@
+Type Detector Model Information
+================================
+
+Architecture: resnet18
+Classes: ['fork', 'knife', 'spoon']
+Best Validation Accuracy: 100.00%
+Test Set Accuracy: 1.00%
+Total Epochs: 25
+Device: cuda
+
+Per-Class Test Metrics:
+
+fork:
+  Precision: 1.000
+  Recall: 1.000
+  F1-Score: 1.000
+
+knife:
+  Precision: 1.000
+  Recall: 1.000
+  F1-Score: 1.000
+
+spoon:
+  Precision: 1.000
+  Recall: 1.000
+  F1-Score: 1.000

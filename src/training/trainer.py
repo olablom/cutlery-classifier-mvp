@@ -110,15 +110,21 @@ class CutleryTrainer:
 
         return self.model
 
-    def create_dataloaders(self) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    def create_dataloaders(
+        self, include_mixed: bool = False
+    ) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """
         Create train, validation, and test dataloaders.
+
+        Args:
+            include_mixed: Whether to include mixed cutlery images in training
 
         Returns:
             Tuple of (train_loader, val_loader, test_loader)
         """
         data_config = self.config.get("data", {})
         data_dir = self.project_root / "data" / "processed"
+        mixed_dir = self.project_root / "data" / "mixed"
 
         # Create transforms
         train_transform = create_transform_from_config(data_config, mode="train")
@@ -127,6 +133,14 @@ class CutleryTrainer:
 
         # Create datasets
         train_dataset = ImageFolder(root=data_dir / "train", transform=train_transform)
+
+        # Add mixed images to training if requested
+        if include_mixed and mixed_dir.exists():
+            mixed_dataset = ImageFolder(root=mixed_dir, transform=train_transform)
+            train_dataset.samples.extend(mixed_dataset.samples)
+            train_dataset.targets.extend(mixed_dataset.targets)
+            logger.info(f"Added {len(mixed_dataset)} mixed images to training set")
+
         val_dataset = ImageFolder(root=data_dir / "val", transform=val_transform)
         test_dataset = ImageFolder(root=data_dir / "test", transform=test_transform)
 
@@ -380,6 +394,9 @@ class CutleryTrainer:
             train_loader: Training data loader
             val_loader: Validation data loader
             num_epochs: Number of epochs to train
+
+        Returns:
+            dict: Training history containing losses and accuracies
         """
         if num_epochs is None:
             num_epochs = self.config.get("training", {}).get("num_epochs", 50)
@@ -455,6 +472,14 @@ class CutleryTrainer:
 
         # Save training log
         self.save_training_log()
+
+        # Return training history
+        return {
+            "train_losses": self.train_losses,
+            "val_losses": self.val_losses,
+            "train_accs": self.train_accs,
+            "val_accs": self.val_accs,
+        }
 
     def save_training_log(self):
         """Save training log with metrics and configuration."""

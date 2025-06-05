@@ -2,12 +2,12 @@
 """
 Dataset Preparation Script for Cutlery Classifier MVP
 
-This script helps organize photo collection with proper directory structure
-and provides utilities for dataset management.
+This script prepares the dataset by:
+1. Creating train/validation/test splits
+2. Copying images to processed directory
+3. Validating the splits
 
 Usage:
-    python scripts/prepare_dataset.py --setup-dirs
-    python scripts/prepare_dataset.py --validate-dataset
     python scripts/prepare_dataset.py --create-splits
 """
 
@@ -19,6 +19,15 @@ from typing import Dict, List, Tuple
 import shutil
 from collections import defaultdict
 import random
+import logging
+import sys
+
+# Add src to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -182,123 +191,106 @@ def validate_dataset():
     return stats
 
 
-def create_train_val_test_splits():
-    """Create train/validation/test splits from raw data."""
+def create_train_val_test_splits(
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.2,
+    test_ratio: float = 0.1,
+    seed: int = 42,
+) -> bool:
+    """
+    Create train/validation/test splits from raw data.
 
+    Args:
+        train_ratio: Ratio of training data
+        val_ratio: Ratio of validation data
+        test_ratio: Ratio of test data
+        seed: Random seed for reproducibility
+
+    Returns:
+        bool: True if successful
+    """
     print("📂 Creating train/val/test splits...")
 
-    raw_dir = PROJECT_ROOT / "data" / "raw"
-    processed_dir = PROJECT_ROOT / "data" / "processed"
+    # Set random seed
+    random.seed(seed)
 
-    # Clear existing processed data
+    # Setup paths
+    raw_dir = project_root / "data" / "raw"
+    processed_dir = project_root / "data" / "processed"
+
+    # Create processed directory structure
+    splits = ["train", "val", "test"]
+    categories = ["fork", "knife", "spoon"]
+
+    # Remove existing processed directory if it exists
     if processed_dir.exists():
         shutil.rmtree(processed_dir)
 
-    split_info = defaultdict(lambda: defaultdict(list))
+    # Create directory structure
+    for split in splits:
+        for category in categories:
+            (processed_dir / split / category).mkdir(parents=True, exist_ok=True)
 
-    for cutlery_type in DATASET_CONFIG["types"]:
-        for manufacturer in DATASET_CONFIG["manufacturers"]:
-            type_dir = raw_dir / cutlery_type / manufacturer
+    # Process each category
+    for category in categories:
+        print(f"\nProcessing {category}...")
 
-            if not type_dir.exists():
-                continue
+        # Get all images
+        image_files = list((raw_dir / category).glob("*.jpg"))
+        random.shuffle(image_files)
 
-            # Get all image files
-            image_files = (
-                list(type_dir.glob("*.jpg"))
-                + list(type_dir.glob("*.jpeg"))
-                + list(type_dir.glob("*.png"))
-            )
+        # Calculate split sizes
+        total = len(image_files)
+        train_size = int(total * train_ratio)
+        val_size = int(total * val_ratio)
 
-            if len(image_files) < DATASET_CONFIG["min_images_per_class"]:
-                print(
-                    f"⚠️  Skipping {cutlery_type}/{manufacturer}: only {len(image_files)} images"
-                )
-                continue
+        # Split files
+        train_files = image_files[:train_size]
+        val_files = image_files[train_size : train_size + val_size]
+        test_files = image_files[train_size + val_size :]
 
-            # Shuffle for random splits
-            random.shuffle(image_files)
+        # Copy files to respective directories
+        for files, split in [
+            (train_files, "train"),
+            (val_files, "val"),
+            (test_files, "test"),
+        ]:
+            target_dir = processed_dir / split / category
+            print(f"  {split}: {len(files)} images")
 
-            # Calculate split sizes
-            n_total = len(image_files)
-            n_train = int(n_total * DATASET_CONFIG["train_split"])
-            n_val = int(n_total * DATASET_CONFIG["val_split"])
-            n_test = n_total - n_train - n_val
+            for src in files:
+                dst = target_dir / src.name
+                shutil.copy2(src, dst)
 
-            # Split files
-            train_files = image_files[:n_train]
-            val_files = image_files[n_train : n_train + n_val]
-            test_files = image_files[n_train + n_val :]
+    # Verify splits
+    print("\n📊 Final Split Summary:")
+    total_processed = 0
 
-            # Copy files to processed directories
-            for split, files in [
-                ("train", train_files),
-                ("val", val_files),
-                ("test", test_files),
-            ]:
-                split_dir = processed_dir / split / cutlery_type
-                split_dir.mkdir(parents=True, exist_ok=True)
+    for split in splits:
+        split_total = 0
+        print(f"\n{split.upper()}:")
 
-                for i, src_file in enumerate(files):
-                    # Create new filename with manufacturer info
-                    dst_name = f"{manufacturer}_{i + 1:03d}{src_file.suffix}"
-                    dst_path = split_dir / dst_name
-                    shutil.copy2(src_file, dst_path)
+        for category in categories:
+            count = len(list((processed_dir / split / category).glob("*.jpg")))
+            split_total += count
+            print(f"  {category}: {count} images")
 
-                    split_info[split][cutlery_type].append(str(dst_path))
+        print(f"  Total: {split_total}")
+        total_processed += split_total
 
-            print(
-                f"✅ {cutlery_type}/{manufacturer}: {n_train} train, {n_val} val, {n_test} test"
-            )
-
-    # Save split information
-    split_info_path = processed_dir / "split_info.json"
-    with open(split_info_path, "w") as f:
-        json.dump(dict(split_info), f, indent=2)
-
-    print(f"📄 Split information saved: {split_info_path}")
-    print("✅ Dataset splits created successfully!")
+    print(f"\nTotal processed images: {total_processed}")
+    return True
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Prepare dataset for cutlery classifier"
-    )
+    parser = argparse.ArgumentParser(description="Prepare cutlery dataset")
     parser.add_argument(
-        "--setup-dirs",
-        action="store_true",
-        help="Setup directory structure for data collection",
+        "--create-splits", action="store_true", help="Create train/val/test splits"
     )
-    parser.add_argument(
-        "--validate-dataset",
-        action="store_true",
-        help="Validate collected dataset and show statistics",
-    )
-    parser.add_argument(
-        "--create-splits",
-        action="store_true",
-        help="Create train/val/test splits from raw data",
-    )
-    parser.add_argument(
-        "--all", action="store_true", help="Run all operations in sequence"
-    )
-
     args = parser.parse_args()
 
-    if args.all:
-        setup_directory_structure()
-        print("\n" + "=" * 50)
-        validate_dataset()
-        print("\n" + "=" * 50)
+    if args.create_splits:
         create_train_val_test_splits()
-    elif args.setup_dirs:
-        setup_directory_structure()
-    elif args.validate_dataset:
-        validate_dataset()
-    elif args.create_splits:
-        create_train_val_test_splits()
-    else:
-        parser.print_help()
 
 
 if __name__ == "__main__":

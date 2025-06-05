@@ -18,119 +18,83 @@ Features:
 import torch
 import torch.nn as nn
 from torchvision import models
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def create_model(config: Dict[str, Any]) -> nn.Module:
-    """
-    Create a model based on configuration parameters.
+def create_model(
+    model_config, num_classes=3, pretrained=True, grayscale=True, freeze_backbone=False
+):
+    """Create a model with specified configuration.
 
     Args:
-        config: Dictionary containing model configuration with keys:
-            - architecture: str, model architecture ('resnet18' or 'mobilenet_v2')
-            - num_classes: int, number of output classes
-            - pretrained: bool, whether to use pretrained weights
-            - grayscale: bool, whether input is grayscale (1 channel)
-            - freeze_backbone: bool, whether to freeze backbone layers
-            - dropout_rate: float, dropout rate for classifier
+        model_config (Union[str, Dict]): Either model name as string or config dict
+        num_classes (int): Number of output classes
+        pretrained (bool): Whether to use pretrained weights
+        grayscale (bool): Whether input images are grayscale
+        freeze_backbone (bool): Whether to freeze backbone layers
 
     Returns:
-        nn.Module: Configured PyTorch model
-
-    Raises:
-        ValueError: If unsupported architecture is specified
+        torch.nn.Module: The configured model
     """
-    architecture = config.get("architecture", "resnet18").lower()
-    num_classes = config.get("num_classes", 3)
-    pretrained = config.get("pretrained", True)
-    grayscale = config.get("grayscale", True)
-    freeze_backbone = config.get("freeze_backbone", False)
-    dropout_rate = config.get("dropout_rate", 0.5)
+    # Handle dict input
+    if isinstance(model_config, dict):
+        model_name = model_config.get("architecture")
+        num_classes = model_config.get("num_classes", num_classes)
+        pretrained = model_config.get("pretrained", pretrained)
+        grayscale = model_config.get("grayscale", grayscale)
+        freeze_backbone = model_config.get("freeze_backbone", freeze_backbone)
+    else:
+        model_name = model_config
 
-    logger.info(f"Creating {architecture} model with {num_classes} classes")
+    logger.info(f"Creating {model_name} model with {num_classes} classes")
     logger.info(
         f"Pretrained: {pretrained}, Grayscale: {grayscale}, Freeze: {freeze_backbone}"
     )
 
-    if architecture == "resnet18":
-        model = _create_resnet18(
-            num_classes=num_classes,
-            pretrained=pretrained,
-            grayscale=grayscale,
-            freeze_backbone=freeze_backbone,
-            dropout_rate=dropout_rate,
+    # Create model with pretrained weights if specified
+    if model_name == "resnet18":
+        weights = models.ResNet18_Weights.DEFAULT if pretrained else None
+        model = models.resnet18(weights=weights)
+
+        # Modify first conv layer for grayscale if needed
+        if grayscale:
+            original_conv = model.conv1
+            model.conv1 = torch.nn.Conv2d(
+                1, 64, kernel_size=7, stride=2, padding=3, bias=False
+            )
+            if pretrained:
+                model.conv1.weight.data = original_conv.weight.data.sum(
+                    dim=1, keepdim=True
+                )
+
+        # Modify final layer for our number of classes
+        in_features = model.fc.in_features
+        model.fc = torch.nn.Sequential(
+            torch.nn.Dropout(0.5), torch.nn.Linear(in_features, num_classes)
         )
-    elif architecture == "mobilenet_v2":
+
+        # Freeze backbone if specified
+        if freeze_backbone:
+            for param in list(model.parameters())[:-2]:
+                param.requires_grad = False
+    elif model_name == "mobilenet_v2":
         model = _create_mobilenet_v2(
             num_classes=num_classes,
             pretrained=pretrained,
             grayscale=grayscale,
             freeze_backbone=freeze_backbone,
-            dropout_rate=dropout_rate,
         )
     else:
-        raise ValueError(
-            f"Unsupported architecture: {architecture}. "
-            f"Supported: ['resnet18', 'mobilenet_v2']"
-        )
+        raise ValueError(f"Unsupported model architecture: {model_name}")
 
-    # Log model info
+    # Log model parameters
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(
         f"Model created: {total_params:,} total params, {trainable_params:,} trainable"
-    )
-
-    return model
-
-
-def _create_resnet18(
-    num_classes: int,
-    pretrained: bool = True,
-    grayscale: bool = True,
-    freeze_backbone: bool = False,
-    dropout_rate: float = 0.5,
-) -> nn.Module:
-    """Create ResNet18 model with custom configuration."""
-
-    # Load pretrained ResNet18
-    model = models.resnet18(pretrained=pretrained)
-
-    # Modify first layer for grayscale input if needed
-    if grayscale:
-        # Replace first conv layer to accept 1 channel instead of 3
-        original_conv = model.conv1
-        model.conv1 = nn.Conv2d(
-            in_channels=1,
-            out_channels=original_conv.out_channels,
-            kernel_size=original_conv.kernel_size,
-            stride=original_conv.stride,
-            padding=original_conv.padding,
-            bias=original_conv.bias,
-        )
-
-        # If pretrained, initialize new conv layer with averaged weights
-        if pretrained:
-            with torch.no_grad():
-                # Average the RGB weights to create grayscale weights
-                model.conv1.weight = nn.Parameter(
-                    original_conv.weight.mean(dim=1, keepdim=True)
-                )
-
-    # Freeze backbone if requested
-    if freeze_backbone:
-        for name, param in model.named_parameters():
-            if "fc" not in name:  # Don't freeze final classifier
-                param.requires_grad = False
-        logger.info("Backbone layers frozen for fine-tuning")
-
-    # Replace final classifier
-    num_features = model.fc.in_features
-    model.fc = nn.Sequential(
-        nn.Dropout(dropout_rate), nn.Linear(num_features, num_classes)
     )
 
     return model
@@ -141,7 +105,6 @@ def _create_mobilenet_v2(
     pretrained: bool = True,
     grayscale: bool = True,
     freeze_backbone: bool = False,
-    dropout_rate: float = 0.5,
 ) -> nn.Module:
     """Create MobileNetV2 model with custom configuration."""
 
@@ -179,7 +142,7 @@ def _create_mobilenet_v2(
     # Replace final classifier
     num_features = model.classifier[1].in_features
     model.classifier = nn.Sequential(
-        nn.Dropout(dropout_rate), nn.Linear(num_features, num_classes)
+        nn.Dropout(0.5), nn.Linear(num_features, num_classes)
     )
 
     return model
@@ -211,29 +174,27 @@ def test_model_creation():
 
     # Test ResNet18 for type detection
     type_config = {
-        "architecture": "resnet18",
+        "model_name": "resnet18",
         "num_classes": 3,
         "pretrained": True,
         "grayscale": True,
         "freeze_backbone": False,
-        "dropout_rate": 0.5,
     }
 
     # Test MobileNetV2 for manufacturer classification
     manufacturer_config = {
-        "architecture": "mobilenet_v2",
+        "model_name": "mobilenet_v2",
         "num_classes": 3,
         "pretrained": True,
         "grayscale": True,
         "freeze_backbone": False,
-        "dropout_rate": 0.3,
     }
 
     print("Testing model creation...")
 
     # Create models
-    type_model = create_model(type_config)
-    manufacturer_model = create_model(manufacturer_config)
+    type_model = create_model(**type_config)
+    manufacturer_model = create_model(**manufacturer_config)
 
     # Test forward pass with dummy data
     dummy_input = torch.randn(1, 1, 320, 320)  # Batch=1, Channels=1, H=320, W=320
