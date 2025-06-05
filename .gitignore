@@ -217,4 +217,36 @@ config/secrets.yaml
 
 # OS specific
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Project specific ignores
+# Datasets
+data/raw/
+data/processed/
+data/augmented/
+test_images/
+
+# Results and exports
+results/
+models/exports/
+logs/
+wandb/
+mlruns/
+
+# Keep best_model.pt in version control
+!models/checkpoints/best_model.pt
+
+# Large data files
+*.csv
+*.json
+*.log
+
+# Image files (except demo images)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.webp
+!demo_images/*.* 
