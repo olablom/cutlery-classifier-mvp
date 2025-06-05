@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 """
-Unified Inference Script for Cutlery Classifier
+Inference script for cutlery classification model.
 
-This script supports:
-1. Regular inference on single images
-2. Grad-CAM visualization using pytorch_grad_cam
-3. Both CPU and CUDA execution
+This script runs inference on a single image using the trained ResNet18 model,
+with optional Grad-CAM visualization support.
 
-Usage:
-    python run_inference.py --device [cuda|cpu] --image path/to/image.jpg [--grad-cam]
+Dependencies:
+    pytorch-grad-cam>=1.4.0
+    matplotlib>=3.3.0
 """
 
-import argparse
+import os
 import logging
+import argparse
 from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Tuple, Optional
+
 import torch
-import torchvision.transforms as transforms
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import transforms, models
 from PIL import Image
 import numpy as np
-import cv2
-from datetime import datetime
+import matplotlib.pyplot as plt
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 
-from src.models.factory import create_model
-from src.utils.device import get_device
-from src.visualization.grad_cam_utils import generate_grad_cam
 
 # Configure logging
 logging.basicConfig(
@@ -31,75 +34,155 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Constants
-CLASS_LABELS = ["fork", "knife", "spoon"]
-IMAGE_SIZE = 320
-CHECKPOINT_PATH = "models/checkpoints/type_detector_best.pth"
 
+def load_model(device: torch.device) -> Tuple[nn.Module, List[str]]:
+    """
+    Load the trained ResNet18 model and class names.
 
-def create_model_config():
-    """Create default model configuration."""
-    return {
-        "architecture": "resnet18",
-        "num_classes": len(CLASS_LABELS),
-        "pretrained": True,
-        "grayscale": True,
-        "freeze_backbone": False,
-    }
+    Args:
+        device: torch device to load model on
 
+    Returns:
+        model: loaded and configured model
+        class_names: list of class names
+    """
+    model_path = Path("models/checkpoints/best_model.pt")
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model not found at {model_path}")
 
-def load_model(device: str) -> torch.nn.Module:
-    """Load the trained model from checkpoint."""
-    # Create model using factory with config
-    config = create_model_config()
-    model = create_model(config)
+    # Try to load class names from training data directory
+    data_dirs = [Path("data/processed/train"), Path("data/augmented")]
 
-    if not Path(CHECKPOINT_PATH).exists():
-        raise FileNotFoundError(f"Checkpoint not found at {CHECKPOINT_PATH}")
+    class_names = None
+    for data_dir in data_dirs:
+        if data_dir.exists():
+            class_names = sorted([d.name for d in data_dir.iterdir() if d.is_dir()])
+            if class_names:
+                break
 
-    checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    if not class_names:
+        raise RuntimeError(
+            "Could not find class names in data/processed/train or data/augmented"
+        )
+
+    num_classes = len(class_names)
+    logger.info(f"Found {num_classes} classes: {', '.join(class_names)}")
+
+    # Create and configure model
+    model = models.resnet18(pretrained=False)
+    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
+
+    # Load trained weights
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model = model.to(device)
     model.eval()
 
-    return model
+    logger.info("Model loaded successfully")
+    return model, class_names
 
 
-def preprocess_image(image_path: str, device: str) -> tuple:
-    """Load and preprocess an image for inference and visualization."""
-    # Load image
-    image = Image.open(image_path).convert("L")
+def preprocess_image(image_path: str) -> torch.Tensor:
+    """
+    Preprocess image for model inference.
 
-    # Prepare normalized tensor for inference
+    Args:
+        image_path: path to input image
+
+    Returns:
+        preprocessed image tensor
+    """
+    if not Path(image_path).exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+
     transform = transforms.Compose(
         [
-            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            transforms.Grayscale(),
+            transforms.Resize((320, 320)),
             transforms.ToTensor(),
-            transforms.Normalize([0.485], [0.229]),  # ImageNet stats for grayscale
+            transforms.Normalize(mean=[0.449], std=[0.226]),
         ]
     )
-    image_tensor = transform(image).unsqueeze(0).to(device)
 
-    # Prepare normalized image for Grad-CAM visualization
-    image_for_cam = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    image_for_cam = cv2.resize(image_for_cam, (IMAGE_SIZE, IMAGE_SIZE))
-    image_for_cam = image_for_cam / 255.0  # Normalize to [0, 1]
-
-    return image_tensor, image_for_cam
+    image = Image.open(image_path)
+    return transform(image).unsqueeze(0)  # Add batch dimension
 
 
-def run_inference(model: torch.nn.Module, image_tensor: torch.Tensor) -> tuple:
-    """Run inference and return prediction and probabilities."""
+def get_predictions(
+    model: nn.Module,
+    image_tensor: torch.Tensor,
+    class_names: List[str],
+    device: torch.device,
+) -> Dict[str, float]:
+    """
+    Get model predictions and class probabilities.
+
+    Args:
+        model: trained model
+        image_tensor: preprocessed input image
+        class_names: list of class names
+        device: torch device
+
+    Returns:
+        dictionary of class probabilities
+    """
     with torch.no_grad():
+        image_tensor = image_tensor.to(device)
         outputs = model(image_tensor)
-        probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        predicted_class = torch.argmax(probabilities, dim=1).item()
+        probabilities = F.softmax(outputs, dim=1)[0]
 
-    return CLASS_LABELS[predicted_class], probabilities[0].tolist()
+    return {
+        class_name: prob.item() for class_name, prob in zip(class_names, probabilities)
+    }
+
+
+def generate_grad_cam(
+    model: nn.Module,
+    image_path: str,
+    image_tensor: torch.Tensor,
+    predicted_class: str,
+    device: torch.device,
+) -> None:
+    """
+    Generate and save Grad-CAM visualization.
+
+    Args:
+        model: trained model
+        image_path: path to original image
+        image_tensor: preprocessed image tensor
+        predicted_class: predicted class name
+        device: torch device
+    """
+    # Configure GradCAM
+    target_layer = model.layer4[-1]  # Last layer of ResNet
+    cam = GradCAM(model=model, target_layers=[target_layer])
+
+    # Generate CAM
+    grayscale_cam = cam(input_tensor=image_tensor)
+
+    # Load and preprocess original image for visualization
+    rgb_img = Image.open(image_path).convert("RGB")
+    rgb_img = rgb_img.resize((320, 320))
+    rgb_img = np.array(rgb_img) / 255.0
+
+    # Create visualization
+    visualization = show_cam_on_image(rgb_img, grayscale_cam[0])
+
+    # Save result
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path("results/grad_cam")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = output_dir / f"{predicted_class}_{timestamp}.jpg"
+    plt.imsave(str(output_path), visualization)
+    logger.info(f"Grad-CAM visualization saved to: {output_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run inference on a single image")
+    """Main inference function."""
+    parser = argparse.ArgumentParser(
+        description="Run inference on an image using trained cutlery classifier"
+    )
     parser.add_argument(
         "--device",
         type=str,
@@ -114,31 +197,40 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate device
-    device = get_device(args.device)
+    # Set up device
+    if args.device == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA requested but not available. Using CPU instead.")
+        device = torch.device("cpu")
+    else:
+        device = torch.device(args.device)
+
     logger.info(f"Using device: {device}")
 
-    # Load model
-    model = load_model(device)
-    logger.info("Model loaded successfully")
+    try:
+        # Load model and preprocess image
+        model, class_names = load_model(device)
+        image_tensor = preprocess_image(args.image)
 
-    # Preprocess image
-    image_tensor, image_for_cam = preprocess_image(args.image, device)
+        # Get predictions
+        predictions = get_predictions(model, image_tensor, class_names, device)
+        predicted_class = max(predictions.items(), key=lambda x: x[1])[0]
 
-    # Run inference
-    predicted_class, probabilities = run_inference(model, image_tensor)
+        # Log results
+        logger.info("\nPrediction Results:")
+        logger.info(f"Predicted class: {predicted_class}")
+        logger.info("Class probabilities:")
+        for class_name, probability in sorted(
+            predictions.items(), key=lambda x: x[1], reverse=True
+        ):
+            logger.info(f"{class_name}: {probability:.4f}")
 
-    # Print results
-    logger.info(f"\nPrediction Results:")
-    logger.info(f"Predicted class: {predicted_class}")
-    logger.info("\nClass probabilities:")
-    for label, prob in zip(CLASS_LABELS, probabilities):
-        logger.info(f"{label}: {prob:.4f}")
+        # Generate Grad-CAM if requested
+        if args.grad_cam:
+            generate_grad_cam(model, args.image, image_tensor, predicted_class, device)
 
-    # Generate Grad-CAM if requested
-    if args.grad_cam:
-        logger.info("\nGenerating Grad-CAM visualization...")
-        generate_grad_cam(model, image_tensor, image_for_cam, predicted_class, device)
+    except Exception as e:
+        logger.error(f"Error during inference: {str(e)}")
+        raise
 
 
 if __name__ == "__main__":
