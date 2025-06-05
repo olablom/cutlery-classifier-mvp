@@ -52,13 +52,13 @@ def load_model(device: torch.device) -> nn.Module:
     model = models.resnet18(pretrained=False)
     model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
-    # Load state dict to get number of classes
-    state_dict = torch.load(model_path, map_location=device)
-    num_classes = state_dict["fc.weight"].size(0)
+    # Load checkpoint to get number of classes
+    checkpoint = torch.load(model_path, map_location=device)
+    num_classes = checkpoint["model_state_dict"]["fc.weight"].size(0)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
 
     # Load weights and prepare model
-    model.load_state_dict(state_dict)
+    model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
 

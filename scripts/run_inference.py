@@ -73,8 +73,9 @@ def load_model(device: torch.device) -> Tuple[nn.Module, List[str]]:
     model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
 
-    # Load trained weights
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load trained weights from checkpoint
+    checkpoint = torch.load(model_path, map_location=device)
+    model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
 
