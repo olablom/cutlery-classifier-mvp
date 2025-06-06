@@ -13,37 +13,49 @@ Usage:
 
 import argparse
 import logging
-import yaml
-from pathlib import Path
 import sys
+from datetime import datetime
+from pathlib import Path
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
 import torch
+import yaml
+from sklearn.metrics import confusion_matrix, classification_report
+from src.training.trainer import CutleryTrainer
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.training.trainer import CutleryTrainer
-from src.evaluation.evaluator import CutleryEvaluator
-
 # Setup logging
 logger = logging.getLogger(__name__)
 
 
-def plot_training_history(history, save_dir):
-    """Plot training history and save figures."""
-    if not history:
-        logger.warning("No training history provided, skipping plot generation")
-        return
+def get_class_names(train_dir: str) -> list:
+    """
+    Get class names from training directory structure.
 
-    # Create plots directory if it doesn't exist
-    plots_dir = Path(save_dir)
-    plots_dir.mkdir(parents=True, exist_ok=True)
+    Args:
+        train_dir: Path to training directory
 
-    # Plot training and validation loss
+    Returns:
+        List of class names (sorted)
+    """
+    train_path = Path(train_dir)
+    if not train_path.exists():
+        raise FileNotFoundError(f"Training directory not found: {train_dir}")
+
+    class_names = sorted([d.name for d in train_path.iterdir() if d.is_dir()])
+    if not class_names:
+        raise ValueError(f"No class directories found in {train_dir}")
+
+    return class_names
+
+
+def plot_training_history(history, run_dir):
+    """Plot and save training/validation curves."""
+    # Plot training loss
     plt.figure(figsize=(10, 5))
     plt.plot(history["train_losses"], label="Training Loss")
     plt.plot(history["val_losses"], label="Validation Loss")
@@ -51,11 +63,11 @@ def plot_training_history(history, save_dir):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.grid(True)
-    plt.savefig(plots_dir / "loss_history.png")
+    plt.tight_layout()
+    plt.savefig(run_dir / "loss_history.png")
     plt.close()
 
-    # Plot training and validation accuracy
+    # Plot accuracy
     plt.figure(figsize=(10, 5))
     plt.plot(history["train_accs"], label="Training Accuracy")
     plt.plot(history["val_accs"], label="Validation Accuracy")
@@ -63,45 +75,71 @@ def plot_training_history(history, save_dir):
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy (%)")
     plt.legend()
-    plt.grid(True)
-    plt.savefig(plots_dir / "accuracy_history.png")
+    plt.tight_layout()
+    plt.savefig(run_dir / "accuracy_history.png")
     plt.close()
 
-    logger.info(f"Training plots saved in: {plots_dir}")
+    logging.info("Training history plots saved to results directory")
 
 
-def plot_confusion_matrix(y_true, y_pred, class_names, save_path):
-    """Create and save confusion matrix plot."""
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(10, 8))
+def plot_confusion_matrix(y_true, y_pred, class_names, save_path, labels=None):
+    """Create and save a robust confusion matrix plot."""
+    logging.info("Generating confusion matrix...")
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+
+    if labels is None:
+        # Default: use sorted unique labels in y_true
+        labels = sorted(np.unique(y_true))
+        logging.warning(
+            f"No labels provided. Using unique labels from y_true: {labels}"
+        )
+        used_class_names = [class_names[i] for i in labels]
+    else:
+        logging.info(f"Using provided labels: {labels}")
+        # When labels are provided (as in test), class_names *is already* correct (you passed test_class_names!)
+        used_class_names = class_names
+
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    logging.info(f"Confusion matrix shape: {cm.shape}")
+
+    plt.figure(figsize=(8, 6))
     sns.heatmap(
         cm,
         annot=True,
         fmt="d",
         cmap="Blues",
-        xticklabels=class_names,
-        yticklabels=class_names,
+        xticklabels=used_class_names,
+        yticklabels=used_class_names,
+        cbar=True,
     )
     plt.title("Confusion Matrix")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
 
+    logging.info(f"Confusion matrix saved to: {save_path}")
+
 
 def evaluate_model(trainer, test_loader, save_dir):
-    """Evaluate model on test set and save results."""
+    """Evaluate model on test set and save results, including correct/incorrect examples."""
     device = trainer.device
     model = trainer.model
-    class_names = trainer.class_names
+    test_class_names = trainer.test_classes
+    test_labels = list(range(len(trainer.test_classes)))
 
     # Switch to evaluation mode
     model.eval()
 
     all_preds = []
     all_labels = []
+    all_images = []
 
     logging.info("Evaluating model on test set...")
+    logging.info(f"Test classes: {test_class_names}")
+    logging.info(f"Using labels: {test_labels}")
 
     with torch.no_grad():
         for images, labels in test_loader:
@@ -111,24 +149,93 @@ def evaluate_model(trainer, test_loader, save_dir):
 
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.numpy())
+            all_images.extend(images.cpu())
 
-    # Calculate metrics
+    # Convert to numpy arrays
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
+
+    # Classification report
     report = classification_report(
-        all_labels, all_preds, target_names=class_names, output_dict=True
+        all_labels,
+        all_preds,
+        target_names=test_class_names,
+        labels=test_labels,
+        output_dict=True,
+        zero_division=0,
     )
 
-    # Save classification report
-    report_path = Path(save_dir) / "test_results.txt"
+    # Compute accuracy manually
+    accuracy = np.mean(all_preds == all_labels) * 100.0
+    logging.info(f"Test Set Accuracy: {accuracy:.2f}%")
+
+    # Save text report
+    report_path = save_dir / "test_results.txt"
     with open(report_path, "w") as f:
         f.write("Test Set Evaluation Results\n")
         f.write("==========================\n\n")
-        f.write(classification_report(all_labels, all_preds, target_names=class_names))
+        f.write(f"Overall Accuracy: {accuracy:.2f}%\n\n")
+        f.write("Detailed Classification Report:\n\n")
+        f.write(
+            classification_report(
+                all_labels,
+                all_preds,
+                target_names=test_class_names,
+                labels=test_labels,
+                zero_division=0,
+            )
+        )
 
     # Plot confusion matrix
-    cm_path = Path(save_dir) / "confusion_matrix.png"
-    plot_confusion_matrix(all_labels, all_preds, class_names, cm_path)
+    cm_path = save_dir / "confusion_matrix.png"
+    plot_confusion_matrix(
+        all_labels, all_preds, test_class_names, cm_path, labels=test_labels
+    )
 
-    return report
+    logging.info("Saved test report to: {}".format(report_path))
+    logging.info("Saved confusion matrix to: {}".format(cm_path))
+
+    # Optional sanity print:
+    logging.info("Evaluation summary")
+    logging.info(f"Unique true labels: {np.unique(all_labels)}")
+    logging.info(f"Unique predicted labels: {np.unique(all_preds)}")
+
+    # Save correct/incorrect examples
+    import torchvision.transforms.functional as F
+
+    correct_dir = save_dir / "examples_correct"
+    incorrect_dir = save_dir / "examples_incorrect"
+    correct_dir.mkdir(exist_ok=True)
+    incorrect_dir.mkdir(exist_ok=True)
+
+    logging.info("Saving example images (correct/incorrect)...")
+
+    num_saved_correct = 0
+    num_saved_incorrect = 0
+    max_examples = 5  # Save up to 5 correct and 5 incorrect
+
+    for idx, (image_tensor, true_label, pred_label) in enumerate(
+        zip(all_images, all_labels, all_preds)
+    ):
+        if num_saved_correct >= max_examples and num_saved_incorrect >= max_examples:
+            break
+
+        # Convert tensor to image
+        img = F.to_pil_image(image_tensor)
+
+        filename = f"img_{idx}_true-{test_class_names[true_label]}_pred-{test_class_names[pred_label]}.png"
+
+        if true_label == pred_label and num_saved_correct < max_examples:
+            img.save(correct_dir / filename)
+            num_saved_correct += 1
+        elif true_label != pred_label and num_saved_incorrect < max_examples:
+            img.save(incorrect_dir / filename)
+            num_saved_incorrect += 1
+
+    logging.info(f"Saved {num_saved_correct} correct examples to: {correct_dir}")
+    logging.info(f"Saved {num_saved_incorrect} incorrect examples to: {incorrect_dir}")
+
+    return {"report": report, "accuracy": accuracy}
 
 
 def load_config(config_path: str) -> dict:
@@ -140,11 +247,18 @@ def load_config(config_path: str) -> dict:
 
 def create_type_detector_config(args) -> dict:
     """Create configuration for type detector training."""
+    # Get class names from training directory
+    train_dir = args.train_dir if args.train_dir else "data/processed/train"
+    class_names = get_class_names(train_dir)
+    num_classes = len(class_names)
+
+    logger.info(f"Classes detected: {class_names}")
+    logger.info(f"num_classes set to: {num_classes}")
 
     config = {
         "model": {
             "architecture": "resnet18",
-            "num_classes": 3,  # fork, knife, spoon
+            "num_classes": num_classes,
             "pretrained": True,
             "grayscale": True,
             "freeze_backbone": False,
@@ -211,15 +325,35 @@ def main():
         action="store_true",
         help="Include mixed cutlery images in training",
     )
+    parser.add_argument(
+        "--train-dir",
+        type=str,
+        default="data/processed/train",
+        help="Path to training data directory",
+    )
+    parser.add_argument(
+        "--val-dir",
+        type=str,
+        default="data/processed/val",
+        help="Path to validation data directory",
+    )
+    parser.add_argument(
+        "--test-dir",
+        type=str,
+        default="data/processed/test",
+        help="Path to test data directory",
+    )
 
     args = parser.parse_args()
 
-    # Setup logging
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.INFO,  # <--- ändra här!
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+
     logger = logging.getLogger(__name__)
+
+    logger.info("DEBUG: Starting main()")
 
     # Load or create configuration
     if args.config and Path(args.config).exists():
@@ -244,32 +378,30 @@ def main():
     logger.info(f"  Batch size: {config['training']['batch_size']}")
     logger.info(f"  Learning rate: {config['training']['learning_rate']}")
 
-    # Check if processed data exists
-    data_dir = project_root / "data" / "processed"
-    if not data_dir.exists():
-        logger.error(f"Processed data directory not found: {data_dir}")
-        logger.error("Please run: python scripts/prepare_dataset.py --create-splits")
-        return
-
-    # Check for train/val/test directories
-    required_dirs = ["train", "val", "test"]
-    for dir_name in required_dirs:
-        dir_path = data_dir / dir_name
-        if not dir_path.exists():
-            logger.error(f"Missing directory: {dir_path}")
-            logger.error(
-                "Please run: python scripts/prepare_dataset.py --create-splits"
-            )
-            return
-
-    # Create trainer
-    trainer = CutleryTrainer(
-        config=config, model_name="type_detector", device=args.device
+    # Prepare run output directory
+    run_dir = (
+        project_root / "results" / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     )
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "examples").mkdir(parents=True, exist_ok=True)
+    logger.info(f"Saving all results to: {run_dir}")
 
-    # Create model and setup training
+    # Initialize trainer WITHOUT test_classes (let create_dataloaders handle it!)
+    trainer = CutleryTrainer(
+        config=config,
+        model_name="type_detector",
+        device=args.device,
+        train_dir=args.train_dir,
+        val_dir=args.val_dir,
+        test_dir=args.test_dir,
+    )
+    logger.info("DEBUG: Created trainer")
+
     trainer.create_model()
+    logger.info("DEBUG: Created model")
+
     trainer.setup_training()
+    logger.info("DEBUG: Setup training done")
 
     # Resume from checkpoint if specified
     if args.resume:
@@ -278,6 +410,7 @@ def main():
 
     try:
         # Create dataloaders
+        logger.info("DEBUG: Creating dataloaders...")
         train_loader, val_loader, test_loader = trainer.create_dataloaders(
             include_mixed=args.mixed_data
         )
@@ -285,33 +418,31 @@ def main():
         # Start training
         logger.info("Starting training...")
         history = trainer.train(train_loader, val_loader)
-
         logger.info("Training completed successfully!")
         logger.info(f"Best validation accuracy: {trainer.best_val_acc:.2f}%")
 
         # Plot training history
         logger.info("Generating training plots...")
-        plot_training_history(history, project_root / "results" / "plots")
+        plot_training_history(history, run_dir)
 
         # Evaluate on test set
         logger.info("Evaluating model on test set...")
-        results_dir = project_root / "results"
-        test_results = evaluate_model(trainer, test_loader, results_dir)
+        test_results = evaluate_model(trainer, test_loader, run_dir)
 
         # Save final model info
-        model_info_path = project_root / "models" / "type_detector_info.txt"
+        model_info_path = run_dir / "type_detector_info.txt"
         with open(model_info_path, "w") as f:
-            f.write(f"Type Detector Model Information\n")
-            f.write(f"================================\n\n")
+            f.write("Type Detector Model Information\n")
+            f.write("================================\n\n")
             f.write(f"Architecture: {config['model']['architecture']}\n")
             f.write(f"Classes: {trainer.class_names}\n")
             f.write(f"Best Validation Accuracy: {trainer.best_val_acc:.2f}%\n")
             f.write(f"Test Set Accuracy: {test_results['accuracy']:.2f}%\n")
             f.write(f"Total Epochs: {trainer.current_epoch + 1}\n")
             f.write(f"Device: {trainer.device}\n")
-            f.write(f"\nPer-Class Test Metrics:\n")
-            for class_name in trainer.class_names:
-                metrics = test_results[class_name]
+            f.write("\nPer-Class Test Metrics:\n")
+            for class_name in trainer.test_classes:
+                metrics = test_results["report"][class_name]
                 f.write(f"\n{class_name}:\n")
                 f.write(f"  Precision: {metrics['precision']:.3f}\n")
                 f.write(f"  Recall: {metrics['recall']:.3f}\n")

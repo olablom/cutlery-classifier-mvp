@@ -171,19 +171,22 @@ demo_images/
 docs/fotograferingsguide.md
 
 # Model files and checkpoints
+models/checkpoints/*
+!models/checkpoints/best_model.pt
 models/exports/
 *.pt
 *.pth
 *.onnx
-!models/checkpoints/best_model.pt
 
 # Results and logs
-results/
+results/*
+!results/grad_cam/
+!results/confusion_matrices/
 logs/
-*.log
 wandb/
 mlruns/
 .tensorboard/
+*.log
 
 # Temporary files
 *.swp
@@ -219,11 +222,14 @@ data/augmented/
 test_images/
 
 # Results and exports
-results/
+results/*
+!results/grad_cam/
+!results/confusion_matrices/
 models/exports/
 logs/
 wandb/
 mlruns/
+!results/plots/
 
 # Keep best_model.pt in version control
 !models/checkpoints/best_model.pt

@@ -34,7 +34,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 # Dataset configuration for MVP
 DATASET_CONFIG = {
-    "types": ["fork", "knife", "spoon"],
+    "types": ["fork_a", "fork_b", "knife_a", "knife_b", "spoon_a", "spoon_b"],
     "manufacturers": ["ikea", "obh"],  # Easy to find, distinct styles
     "target_images_per_class": 40,
     "min_images_per_class": 20,
@@ -201,30 +201,36 @@ def create_train_val_test_splits(
     Create train/validation/test splits from raw data.
 
     Args:
-        train_ratio: Ratio of training data
-        val_ratio: Ratio of validation data
-        test_ratio: Ratio of test data
+        train_ratio: Proportion of data for training
+        val_ratio: Proportion of data for validation
+        test_ratio: Proportion of data for testing
         seed: Random seed for reproducibility
 
     Returns:
         bool: True if successful
     """
-    print("📂 Creating train/val/test splits...")
-
-    # Set random seed
-    random.seed(seed)
+    print("\n📂 Creating train/val/test splits...")
 
     # Setup paths
-    raw_dir = project_root / "data" / "raw"
-    processed_dir = project_root / "data" / "processed"
+    raw_dir = PROJECT_ROOT / "data" / "raw"
+    processed_dir = PROJECT_ROOT / "data" / "processed"
 
     # Create processed directory structure
     splits = ["train", "val", "test"]
-    categories = ["fork", "knife", "spoon"]
+    categories = DATASET_CONFIG["types"]
 
     # Remove existing processed directory if it exists
     if processed_dir.exists():
-        shutil.rmtree(processed_dir)
+        try:
+            shutil.rmtree(processed_dir)
+        except PermissionError:
+            print(
+                "⚠️ Could not remove existing processed directory. Please close any open files and try again."
+            )
+            return False
+        except Exception as e:
+            print(f"⚠️ Error removing processed directory: {e}")
+            return False
 
     # Create directory structure
     for split in splits:
@@ -236,7 +242,16 @@ def create_train_val_test_splits(
         print(f"\nProcessing {category}...")
 
         # Get all images
-        image_files = list((raw_dir / category).glob("*.jpg"))
+        category_dir = raw_dir / category
+        if not category_dir.exists():
+            print(f"⚠️ Category directory not found: {category}")
+            continue
+
+        image_files = list(category_dir.glob("*.jpg"))
+        if not image_files:
+            print(f"⚠️ No images found in {category}")
+            continue
+
         random.shuffle(image_files)
 
         # Calculate split sizes
@@ -260,7 +275,10 @@ def create_train_val_test_splits(
 
             for src in files:
                 dst = target_dir / src.name
-                shutil.copy2(src, dst)
+                try:
+                    shutil.copy2(src, dst)
+                except Exception as e:
+                    print(f"⚠️ Error copying {src.name}: {e}")
 
     # Verify splits
     print("\n📊 Final Split Summary:")

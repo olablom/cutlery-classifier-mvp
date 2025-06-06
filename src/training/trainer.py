@@ -19,12 +19,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
+from torchvision.datasets import DatasetFolder
+from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader
 import numpy as np
 import time
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Union
 import json
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -37,11 +38,44 @@ from ..data.transforms import create_transform_from_config
 logger = logging.getLogger(__name__)
 
 
+class ConfigDatasetFolder(DatasetFolder):
+    """Custom DatasetFolder that uses classes from config."""
+
+    def __init__(
+        self,
+        root: Union[str, Path],
+        classes: List[str],
+        transform: Optional[callable] = None,
+        target_transform: Optional[callable] = None,
+        loader: callable = default_loader,
+        is_valid_file: Optional[callable] = None,
+    ):
+        self.config_classes = classes
+        super().__init__(
+            root,
+            loader,
+            IMG_EXTENSIONS if is_valid_file is None else None,
+            transform=transform,
+            target_transform=target_transform,
+            is_valid_file=is_valid_file,
+        )
+
+    def find_classes(self, directory: str) -> Tuple[List[str], Dict[str, int]]:
+        """Override to use classes from config."""
+        if not self.config_classes:
+            raise ValueError("No classes defined in config")
+
+        classes = sorted(self.config_classes)
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+        return classes, class_to_idx
+
+
 class CutleryTrainer:
     """
     Comprehensive trainer for cutlery classification models.
 
-    Supports both type detection (fork/knife/spoon) and manufacturer classification.
+    Supports both type detection with manufacturer variants (fork_a/fork_b/knife_a/knife_b/spoon_a/spoon_b)
+    and future manufacturer-specific classification.
     """
 
     def __init__(
@@ -49,6 +83,9 @@ class CutleryTrainer:
         config: Dict[str, Any],
         model_name: str = "type_detector",
         device: Optional[str] = None,
+        train_dir: Optional[str] = None,
+        val_dir: Optional[str] = None,
+        test_dir: Optional[str] = None,
     ):
         """
         Initialize trainer with configuration.
@@ -57,9 +94,18 @@ class CutleryTrainer:
             config: Training configuration dictionary
             model_name: Name for saving models and logs
             device: Device to use ('cuda', 'cpu', or None for auto)
+            train_dir: Optional custom training data directory
+            val_dir: Optional custom validation data directory
+            test_dir: Optional custom test directory
         """
         self.config = config
         self.model_name = model_name
+        self.project_root = Path(__file__).parent.parent.parent
+        logger.info(f"Project root set to: {self.project_root}")
+
+        self.train_dir = Path(train_dir) if train_dir else None
+        self.val_dir = Path(val_dir) if val_dir else None
+        self.test_dir = Path(test_dir) if test_dir else None
 
         # Setup device
         if device is None:
@@ -68,6 +114,10 @@ class CutleryTrainer:
             self.device = torch.device(device)
 
         logger.info(f"Using device: {self.device}")
+        if train_dir:
+            logger.info(f"Using custom train directory: {train_dir}")
+        if val_dir:
+            logger.info(f"Using custom validation directory: {val_dir}")
 
         # Initialize components
         self.model = None
@@ -85,6 +135,11 @@ class CutleryTrainer:
 
         # Paths
         self.setup_paths()
+        self.test_dir = (
+            Path(test_dir)
+            if test_dir
+            else self.project_root / "data" / "processed" / "test"
+        )
 
     def setup_paths(self):
         """Setup paths for saving models, logs, and results."""
@@ -110,6 +165,44 @@ class CutleryTrainer:
 
         return self.model
 
+    def update_model_output_layer(self, num_classes: int) -> None:
+        """
+        Update the model's output layer to match the number of classes.
+        Works with both Linear and Sequential heads.
+        """
+        if not hasattr(self.model, "fc"):
+            logger.warning("Model has no fc layer, skipping output layer update")
+            return
+
+        if isinstance(self.model.fc, nn.Linear):
+            in_features = self.model.fc.in_features
+            self.model.fc = nn.Linear(in_features, num_classes)
+        elif isinstance(self.model.fc, nn.Sequential):
+            # Find and replace the last Linear layer
+            last_linear = None
+            for layer in reversed(self.model.fc):
+                if isinstance(layer, nn.Linear):
+                    last_linear = layer
+                    break
+
+            if last_linear is None:
+                logger.warning(
+                    "No Linear layer found in Sequential fc, skipping update"
+                )
+                return
+
+            # Create new Sequential with updated final layer
+            new_layers = []
+            for layer in self.model.fc:
+                if layer is last_linear:
+                    new_layers.append(nn.Linear(last_linear.in_features, num_classes))
+                else:
+                    new_layers.append(layer)
+            self.model.fc = nn.Sequential(*new_layers)
+
+        # Move updated layer to correct device
+        self.model.to(self.device)
+
     def create_dataloaders(
         self, include_mixed: bool = False
     ) -> Tuple[DataLoader, DataLoader, DataLoader]:
@@ -126,31 +219,108 @@ class CutleryTrainer:
         data_dir = self.project_root / "data" / "processed"
         mixed_dir = self.project_root / "data" / "mixed"
 
+        # Use custom directories if provided, otherwise use defaults
+        train_dir = self.train_dir if self.train_dir else data_dir / "train"
+        val_dir = self.val_dir if self.val_dir else data_dir / "val"
+        test_dir = self.test_dir if self.test_dir else data_dir / "test"
+
+        logger.info(f"Using test directory: {test_dir}")
+        print("DEBUG: Listing test_dir contents NOW:")
+        for entry in test_dir.iterdir():
+            print(f"  - {entry.name} (dir={entry.is_dir()})")
+
+        # Verify directories exist
+        if not train_dir.exists():
+            raise FileNotFoundError(f"Training directory not found: {train_dir}")
+        if not val_dir.exists():
+            raise FileNotFoundError(f"Validation directory not found: {val_dir}")
+        if not test_dir.exists():
+            raise FileNotFoundError(f"Test directory not found: {test_dir}")
+
+        # Get expected classes from config
+        expected_classes = self.config.get("classes", [])
+        if not expected_classes:
+            raise ValueError("No classes defined in config")
+
+        # Verify class directories and images exist
+        for class_name in expected_classes:
+            for dir_path in [
+                train_dir / class_name,
+                val_dir / class_name,
+                test_dir / class_name,
+            ]:
+                if not dir_path.exists():
+                    raise FileNotFoundError(f"Class directory not found: {dir_path}")
+
+                # Check for valid images
+                valid_images = (
+                    list(dir_path.glob("*.jpg"))
+                    + list(dir_path.glob("*.jpeg"))
+                    + list(dir_path.glob("*.png"))
+                )
+                if not valid_images:
+                    raise FileNotFoundError(f"No valid images found in {dir_path}")
+                logger.info(f"Found {len(valid_images)} images in {dir_path}")
+
         # Create transforms
         train_transform = create_transform_from_config(data_config, mode="train")
         val_transform = create_transform_from_config(data_config, mode="val")
         test_transform = create_transform_from_config(data_config, mode="test")
 
-        # Create datasets
-        train_dataset = ImageFolder(root=data_dir / "train", transform=train_transform)
+        # Create datasets with explicit class names
+        train_dataset = ConfigDatasetFolder(
+            root=train_dir, classes=expected_classes, transform=train_transform
+        )
+
+        val_dataset = ConfigDatasetFolder(
+            root=val_dir, classes=expected_classes, transform=val_transform
+        )
+
+        test_dataset = ConfigDatasetFolder(
+            root=test_dir, classes=expected_classes, transform=test_transform
+        )
 
         # Add mixed images to training if requested
         if include_mixed and mixed_dir.exists():
-            mixed_dataset = ImageFolder(root=mixed_dir, transform=train_transform)
+            mixed_dataset = ConfigDatasetFolder(
+                root=mixed_dir, classes=expected_classes, transform=train_transform
+            )
             train_dataset.samples.extend(mixed_dataset.samples)
             train_dataset.targets.extend(mixed_dataset.targets)
             logger.info(f"Added {len(mixed_dataset)} mixed images to training set")
 
-        val_dataset = ImageFolder(root=data_dir / "val", transform=val_transform)
-        test_dataset = ImageFolder(root=data_dir / "test", transform=test_transform)
+        # Store class information
+        self.train_classes = train_dataset.classes
+        self.val_classes = val_dataset.classes
+        self.test_classes = test_dataset.classes
+        self.class_names = self.train_classes
+        self.num_classes = len(self.class_names)
 
         # Log class information
-        self.class_names = train_dataset.classes
-        self.num_classes = len(self.class_names)
-        logger.info(f"Classes: {self.class_names}")
-        logger.info(f"Train samples: {len(train_dataset)}")
-        logger.info(f"Val samples: {len(val_dataset)}")
-        logger.info(f"Test samples: {len(test_dataset)}")
+        logger.info(f"Train classes: {self.train_classes}")
+        logger.info(f"Val classes: {self.val_classes}")
+        logger.info(f"Test classes: {self.test_classes}")
+
+        # Update model's num_classes if it doesn't match
+        if self.model is not None and hasattr(self.model, "fc"):
+            current_out_features = None
+            if isinstance(self.model.fc, nn.Linear):
+                current_out_features = self.model.fc.out_features
+            elif isinstance(self.model.fc, nn.Sequential):
+                # Find the last Linear layer in the Sequential
+                for layer in reversed(self.model.fc):
+                    if isinstance(layer, nn.Linear):
+                        current_out_features = layer.out_features
+                        break
+
+            if current_out_features != self.num_classes:
+                self.update_model_output_layer(self.num_classes)
+                logger.info(f"Updated model head to {self.num_classes} classes")
+
+        # Log dataset information
+        logger.info(f"Train samples: {len(train_dataset)} ({train_dir})")
+        logger.info(f"Val samples: {len(val_dataset)} ({val_dir})")
+        logger.info(f"Test samples: {len(test_dataset)} ({test_dir})")
 
         # Create dataloaders
         batch_size = self.config.get("training", {}).get("batch_size", 32)

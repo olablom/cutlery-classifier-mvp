@@ -25,19 +25,20 @@ logger = logging.getLogger(__name__)
 
 
 def create_model(
-    model_config, num_classes=3, pretrained=True, grayscale=True, freeze_backbone=False
+    model_config, num_classes=6, pretrained=True, grayscale=True, freeze_backbone=False
 ):
-    """Create a model with specified configuration.
+    """
+    Create a model based on configuration.
 
     Args:
-        model_config (Union[str, Dict]): Either model name as string or config dict
-        num_classes (int): Number of output classes
-        pretrained (bool): Whether to use pretrained weights
-        grayscale (bool): Whether input images are grayscale
-        freeze_backbone (bool): Whether to freeze backbone layers
+        model_config: Model configuration dictionary or architecture name
+        num_classes: Number of output classes (default: 6 for fork_a, fork_b, knife_a, knife_b, spoon_a, spoon_b)
+        pretrained: Whether to use pretrained weights
+        grayscale: Whether to adapt model for grayscale input
+        freeze_backbone: Whether to freeze backbone layers
 
     Returns:
-        torch.nn.Module: The configured model
+        torch.nn.Module: Configured model
     """
     # Handle dict input
     if isinstance(model_config, dict):
@@ -218,6 +219,31 @@ def test_model_creation():
     )
 
     print("✅ Model creation test passed!")
+
+
+def get_default_model_config():
+    """Get default model configuration."""
+    return {
+        "architecture": "resnet18",
+        "pretrained": True,
+        "num_classes": 6,  # Updated for 6 classes
+        "dropout_rate": 0.5,
+        "freeze_backbone": False,
+        "input_channels": 1,  # Grayscale
+    }
+
+
+def get_default_training_config():
+    """Get default training configuration."""
+    return {
+        "epochs": 30,
+        "batch_size": 32,
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "optimizer": "adam",
+        "num_classes": 6,  # Updated for 6 classes
+        "scheduler": {"type": "step", "step_size": 10, "gamma": 0.1},
+    }
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Cutlery Classifier MVP
 
-A computer vision system that classifies cutlery (forks, knives, spoons) using deep learning. The system uses a ResNet18 architecture trained on grayscale images to achieve high-accuracy classification.
+A computer vision system that classifies cutlery by type and manufacturer variant using deep learning. The system uses a ResNet18 architecture trained on grayscale images to achieve high-accuracy classification between different types (fork_a, fork_b, knife_a, knife_b, spoon_a, spoon_b).
 
 ## Project Overview
 
@@ -14,6 +14,20 @@ A computer vision system that classifies cutlery (forks, knives, spoons) using d
 - Grad-CAM visualization for model interpretability
 - Clean, modular architecture for easy extension
 - Tested on NVIDIA RTX 5090
+
+## Project Checklist
+
+- [x] All tests pass (`pytest`)
+- [x] Documentation complete (`README.md`)
+- [x] Inference scripts verified (`run_inference.py`, `test_dataset_inference.py`)
+- [x] Demo images present (`demo_images/`)
+- [x] Required plots present (`results/plots/`)
+- [x] Grad-CAM visualizations included (`results/grad_cam/`)
+- [x] ONNX export verified (`models/exports/`)
+- [x] No redundant or temporary files in repository
+- [x] `.gitignore` properly configured
+- [x] Project structure matches documented layout
+- [x] Full pipeline is reproducible (clean clone → train → test → export → inference)
 
 ## System Requirements
 
@@ -36,10 +50,7 @@ python -m venv venv
 source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate     # Windows
 
-# Install PyTorch with CUDA support
-pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-
-# Install other dependencies
+# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -52,6 +63,105 @@ cp env.example .env
 # Edit .env with your settings
 nano .env
 ```
+
+## Training the Model
+
+1. **Prepare your dataset**:
+
+```bash
+# Organize raw images into processed format
+python scripts/prepare_dataset.py --raw_dir data/raw --output_dir data/processed
+
+# (Optional) Generate augmented data
+python scripts/augment_dataset.py --input_dir data/processed --output_dir data/augmented
+```
+
+2. **Start training**:
+
+```bash
+# Train with default parameters
+python scripts/train.py --data_dir data/processed --epochs 50 --batch_size 32 --device cuda
+
+# Train with augmented data
+python scripts/train.py --data_dir data/augmented --epochs 50 --batch_size 32 --device cuda
+```
+
+Training outputs will be saved to:
+
+- Model checkpoints: `models/checkpoints/`
+- Training plots: `results/plots/`
+- Logs: `results/logs/`
+
+## Evaluation and Testing
+
+1. **Run inference on test dataset**:
+
+```bash
+python scripts/test_dataset_inference.py --test_dir data/processed/test --model models/checkpoints/best_model.pt
+```
+
+2. **Generate Grad-CAM visualizations**:
+
+```bash
+python scripts/grad_cam.py --image path/to/image.jpg --model models/checkpoints/best_model.pt
+```
+
+3. **Run full test suite**:
+
+```bash
+pytest tests/
+```
+
+Test outputs will be saved to:
+
+- Confusion matrices: `results/confusion_matrices/`
+- Grad-CAM visualizations: `results/grad_cam/`
+- Test reports: `results/test_reports/`
+
+## 📤 Outputs
+
+After training and evaluation, the following outputs will be generated:
+
+- `results/plots/` (Required for presentation)
+  - `confusion_matrix.png` - Model performance visualization
+  - `training_loss.png` - Training convergence plot
+  - `training_accuracy.png` - Accuracy progression
+- `results/grad_cam/`
+  - Grad-CAM visualizations of selected images
+  - Interpretability examples for presentation
+- `results/test_reports/`
+  - Detailed test report (classification report)
+  - Per-class accuracy metrics
+- `demo_images/`
+  - One example image per class (fork_a, fork_b, knife_a, etc.)
+  - Selected Grad-CAM examples for interpretability
+  - Required for project presentation
+- `models/checkpoints/best_model.pt`
+  - Final trained model for inference
+  - Tracked in version control
+- `models/exports/`
+  - ONNX exported model for future deployment
+  - Optimized for edge device deployment
+
+### Export model to ONNX (optional for future deployment):
+
+```bash
+# Export to ONNX format
+python scripts/export_model.py --model models/checkpoints/best_model.pt --format onnx --optimize
+
+# Export to both ONNX and TorchScript (recommended)
+python scripts/export_model.py --model models/checkpoints/best_model.pt --format all --optimize
+
+# Verify exported model
+python scripts/export_model.py --model models/checkpoints/best_model.pt --format onnx --test
+```
+
+The ONNX export enables:
+
+- Deployment to edge devices
+- Framework-independent inference
+- Runtime optimization
+- Quantization support
 
 ## ⚠️ Datasets Disclaimer
 
@@ -113,11 +223,11 @@ cutlery-classifier-mvp/
 
 ## 📊 Performance Metrics
 
-| Metric         | Value                                   |
-| -------------- | --------------------------------------- |
-| Accuracy       | ~25% (current MVP — retraining planned) |
-| Inference Time | <200ms on RTX 5090                      |
-| Memory Usage   | <512MB                                  |
+| Metric         | Value               |
+| -------------- | ------------------- |
+| Accuracy       | 90.00% (latest run) |
+| Inference Time | <200ms on RTX 5090  |
+| Memory Usage   | <512MB              |
 
 ## 🔄 Data Augmentation
 

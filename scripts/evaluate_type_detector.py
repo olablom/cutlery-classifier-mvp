@@ -28,7 +28,7 @@ def main():
     checkpoint = torch.load(model_path, map_location=device)
 
     # Create and load model
-    model = create_model("resnet18", num_classes=3, pretrained=False)
+    model = create_model("resnet18", num_classes=6, pretrained=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
