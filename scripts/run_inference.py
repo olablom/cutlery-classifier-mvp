@@ -20,12 +20,14 @@ from typing import Dict, List, Tuple, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms, models
+from torchvision import transforms
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
+
+from src.models.factory import create_model
 
 
 # Configure logging
@@ -35,18 +37,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(device: torch.device) -> Tuple[nn.Module, List[str]]:
+def load_model(model_path: str, device: torch.device) -> Tuple[nn.Module, List[str]]:
     """
     Load the trained ResNet18 model and class names.
 
     Args:
+        model_path: path to model checkpoint
         device: torch device to load model on
 
     Returns:
         model: loaded and configured model
         class_names: list of class names
     """
-    model_path = Path("models/checkpoints/best_model.pt")
+    model_path = Path(model_path)
+    abs_model_path = model_path.resolve()
+    logger.info(f"Loading model from: {abs_model_path}")
+
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found at {model_path}")
 
@@ -68,10 +74,14 @@ def load_model(device: torch.device) -> Tuple[nn.Module, List[str]]:
     num_classes = len(class_names)
     logger.info(f"Found {num_classes} classes: {', '.join(class_names)}")
 
-    # Create and configure model
-    model = models.resnet18(pretrained=False)
-    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
+    # Create model using factory with same config as training
+    model = create_model(
+        model_config="resnet18",
+        num_classes=num_classes,
+        pretrained=True,
+        grayscale=True,
+        freeze_backbone=False,
+    )
 
     # Load trained weights from checkpoint
     checkpoint = torch.load(model_path, map_location=device)
@@ -79,7 +89,7 @@ def load_model(device: torch.device) -> Tuple[nn.Module, List[str]]:
     model = model.to(device)
     model.eval()
 
-    logger.info("Model loaded successfully")
+    logger.info(f"Model loaded successfully with {num_classes} output classes")
     return model, class_names
 
 
@@ -193,6 +203,12 @@ def main():
     )
     parser.add_argument("--image", type=str, required=True, help="Path to input image")
     parser.add_argument(
+        "--model",
+        type=str,
+        default="models/checkpoints/type_detector_best.pth",
+        help="Path to trained model (.pth). Defaults to models/checkpoints/type_detector_best.pth",
+    )
+    parser.add_argument(
         "--grad-cam", action="store_true", help="Generate Grad-CAM visualization"
     )
 
@@ -209,7 +225,7 @@ def main():
 
     try:
         # Load model and preprocess image
-        model, class_names = load_model(device)
+        model, class_names = load_model(args.model, device)
         image_tensor = preprocess_image(args.image)
 
         # Get predictions

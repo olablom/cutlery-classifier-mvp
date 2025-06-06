@@ -88,7 +88,7 @@ python scripts/train.py --data_dir data/augmented --epochs 50 --batch_size 32 --
 
 Training outputs will be saved to:
 
-- Model checkpoints: `models/checkpoints/`
+- Model checkpoints: `models/checkpoints/type_detector_best.pth` (best model)
 - Training plots: `results/plots/`
 - Logs: `results/logs/`
 
@@ -97,13 +97,13 @@ Training outputs will be saved to:
 1. **Run inference on test dataset**:
 
 ```bash
-python scripts/test_dataset_inference.py --test_dir data/processed/test --model models/checkpoints/best_model.pt
+python scripts/test_dataset_inference.py --test_dir data/processed/test --model models/checkpoints/type_detector_best.pth
 ```
 
 2. **Generate Grad-CAM visualizations**:
 
 ```bash
-python scripts/grad_cam.py --image path/to/image.jpg --model models/checkpoints/best_model.pt
+python scripts/grad_cam.py --image path/to/image.jpg --model models/checkpoints/type_detector_best.pth
 ```
 
 3. **Run full test suite**:
@@ -136,9 +136,9 @@ After training and evaluation, the following outputs will be generated:
   - One example image per class (fork_a, fork_b, knife_a, etc.)
   - Selected Grad-CAM examples for interpretability
   - Required for project presentation
-- `models/checkpoints/best_model.pt`
-  - Final trained model for inference
-  - Tracked in version control
+- `models/checkpoints/`
+  - `type_detector_best.pth` - Best model checkpoint for inference
+  - `type_detector_latest.pth` - Latest model checkpoint (backup)
 - `models/exports/`
   - ONNX exported model for future deployment
   - Optimized for edge device deployment
@@ -147,13 +147,13 @@ After training and evaluation, the following outputs will be generated:
 
 ```bash
 # Export to ONNX format
-python scripts/export_model.py --model models/checkpoints/best_model.pt --format onnx --optimize
+python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format onnx --optimize
 
 # Export to both ONNX and TorchScript (recommended)
-python scripts/export_model.py --model models/checkpoints/best_model.pt --format all --optimize
+python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format all --optimize
 
 # Verify exported model
-python scripts/export_model.py --model models/checkpoints/best_model.pt --format onnx --test
+python scripts/export_model.py --model models/checkpoints/type_detector_best.pth --format onnx --test
 ```
 
 The ONNX export enables:

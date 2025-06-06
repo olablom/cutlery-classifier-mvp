@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms, models
+from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from PIL import Image
 import numpy as np
@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+
+from src.models.factory import create_model
 
 
 # Configure logging
@@ -35,36 +37,59 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(device: torch.device) -> nn.Module:
+def load_model(model_path: str, device: torch.device) -> nn.Module:
     """
     Load the trained ResNet18 model.
 
     Args:
+        model_path: path to model checkpoint
         device: torch device to load model on
 
     Returns:
         loaded and configured model
     """
-    model_path = Path("models/checkpoints/best_model.pt")
+    model_path = Path(model_path)
+    abs_model_path = model_path.resolve()
+    logger.info(f"Loading model from: {abs_model_path}")
+
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found at {model_path}")
 
-    # Create and configure model
-    model = models.resnet18(pretrained=False)
-    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    # Try to load class names from training data directory
+    data_dirs = [Path("data/processed/train"), Path("data/augmented")]
 
-    # Load checkpoint to get number of classes
+    class_names = None
+    for data_dir in data_dirs:
+        if data_dir.exists():
+            class_names = sorted([d.name for d in data_dir.iterdir() if d.is_dir()])
+            if class_names:
+                break
+
+    if not class_names:
+        raise RuntimeError(
+            "Could not find class names in data/processed/train or data/augmented"
+        )
+
+    num_classes = len(class_names)
+    logger.info(f"Found {num_classes} classes: {', '.join(class_names)}")
+
+    # Create model using factory with same config as training
+    model = create_model(
+        model_config="resnet18",
+        num_classes=num_classes,
+        pretrained=True,
+        grayscale=True,
+        freeze_backbone=False,
+    )
+
+    # Load trained weights from checkpoint
     checkpoint = torch.load(model_path, map_location=device)
-    num_classes = checkpoint["model_state_dict"]["fc.weight"].size(0)
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
-
-    # Load weights and prepare model
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
 
-    logger.info("Model loaded successfully")
-    return model
+    logger.info(f"Model loaded successfully with {num_classes} output classes")
+    return model, class_names
 
 
 def create_data_loader(test_dir: str) -> Tuple[DataLoader, List[str]]:
@@ -102,6 +127,7 @@ def generate_grad_cam(
     image_path: str,
     true_label: str,
     pred_label: str,
+    class_names: List[str],
     device: torch.device,
 ) -> None:
     """
@@ -112,6 +138,7 @@ def generate_grad_cam(
         image_path: path to original image
         true_label: true class name
         pred_label: predicted class name
+        class_names: list of class names
         device: torch device
     """
     # Prepare image
@@ -135,7 +162,7 @@ def generate_grad_cam(
     cam = GradCAM(model=model, target_layers=[target_layer])
 
     # Set target class for GradCAM
-    target_class_idx = ["fork", "knife", "spoon"].index(pred_label)
+    target_class_idx = class_names.index(pred_label)
     targets = [ClassifierOutputTarget(target_class_idx)]
 
     # Generate CAM
@@ -203,7 +230,9 @@ def evaluate_model(
             else:
                 misclassified.append((image_path, true_class, pred_class))
                 if save_misclassified:
-                    generate_grad_cam(model, image_path, true_class, pred_class, device)
+                    generate_grad_cam(
+                        model, image_path, true_class, pred_class, class_names, device
+                    )
 
     return correct_per_class, total_per_class, misclassified
 
@@ -224,6 +253,12 @@ def main():
         "--test_dir", type=str, required=True, help="Path to test dataset directory"
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default="models/checkpoints/type_detector_best.pth",
+        help="Path to trained model (.pth). Defaults to models/checkpoints/type_detector_best.pth",
+    )
+    parser.add_argument(
         "--save-misclassified",
         action="store_true",
         help="Generate Grad-CAM visualizations for misclassified images",
@@ -242,7 +277,7 @@ def main():
 
     try:
         # Load model and create data loader
-        model = load_model(device)
+        model, class_names = load_model(args.model, device)
         data_loader, class_names = create_data_loader(args.test_dir)
 
         logger.info(f"Running inference on {len(data_loader)} test images...")
