@@ -15,6 +15,74 @@ A computer vision system that classifies cutlery by type and manufacturer varian
 - Clean, modular architecture for easy extension
 - Tested on NVIDIA RTX 5090
 
+## 🚀 Full Pipeline Example
+
+This is the complete pipeline for training, testing and running inference with the cutlery classifier:
+
+### 1️⃣ (Optional) Data Augmentation with Diffusion
+
+```bash
+PYTHONPATH=. python scripts/augment_dataset.py --input_dir data/processed/train --output_dir data/augmented/train --classes fork_a fork_b knife_a knife_b spoon_a spoon_b
+```
+
+### 2️⃣ Training with Mixed Real + Augmented Data
+
+```bash
+PYTHONPATH=. python scripts/train_type_detector.py --device cuda --config results/best_tuning_config.json --mixed-data
+```
+
+### 3️⃣ Testing on Test Set
+
+```bash
+PYTHONPATH=. python scripts/test_dataset_inference.py --device cuda --test_dir data/processed/test --model models/checkpoints/type_detector_best.pth --save-misclassified
+```
+
+### 4️⃣ Single Image Inference with Grad-CAM
+
+```bash
+PYTHONPATH=. python scripts/run_inference.py --device cuda --image "data/processed/test/fork_a/IMG_0941[1].jpg" --grad-cam
+```
+
+### 💾 Dataset Structure
+
+```
+data/processed/
+├── train/
+│   ├── fork_a/
+│   ├── fork_b/
+│   ├── knife_a/
+│   ├── knife_b/
+│   ├── spoon_a/
+│   ├── spoon_b/
+├── val/
+│   ├── fork_a/
+│   ├── fork_b/
+│   ├── knife_a/
+│   ├── knife_b/
+│   ├── spoon_a/
+│   ├── spoon_b/
+└── test/
+    ├── fork_a/
+    ├── fork_b/
+    ├── knife_a/
+    ├── knife_b/
+    ├── spoon_a/
+    ├── spoon_b/
+```
+
+### 📝 Notes
+
+- Data augmentation is optional but improves model performance
+- The classifier is based on a ResNet18 architecture with grayscale preprocessing
+- The pipeline supports ONNX export for future deployment
+
+## System Requirements
+
+- Python 3.11 or higher
+- CUDA 11.8 (for GPU acceleration)
+- NVIDIA GPU with CUDA support
+- 8GB RAM minimum (16GB recommended for training)
+
 ## Project Checklist
 
 - [x] All tests pass (`pytest`)
@@ -28,13 +96,6 @@ A computer vision system that classifies cutlery by type and manufacturer varian
 - [x] `.gitignore` properly configured
 - [x] Project structure matches documented layout
 - [x] Full pipeline is reproducible (clean clone → train → test → export → inference)
-
-## System Requirements
-
-- Python 3.11 or higher
-- CUDA 11.8 (for GPU acceleration)
-- NVIDIA GPU with CUDA support
-- 8GB RAM minimum (16GB recommended for training)
 
 ## Setup Instructions
 
@@ -78,20 +139,50 @@ All results are saved in timestamped directories:
 
 ## Training the Model
 
-1. **Prepare your dataset**:
+### Dataset Structure
 
-```bash
-# Organize raw images into processed format
-python scripts/prepare_dataset.py --raw_dir data/raw --output_dir data/processed
+The project expects data to be organized in the following structure:
 
-# (Optional) Generate augmented data
-python scripts/augment_dataset.py --input_dir data/processed --output_dir data/augmented
+```
+data/
+  processed/
+    train/
+      fork/
+      knife/
+      spoon/
+    val/
+      fork/
+      knife/
+      spoon/
+    test/
+      fork/
+      knife/
+      spoon/
 ```
 
-2. **Start training**:
+Place your images in these directories before proceeding with training.
+
+### Optional: Data Augmentation
+
+To improve model generalization, you can generate additional training data:
 
 ```bash
-# Train with best tuning configuration
+# Generate augmented training data (optional but recommended)
+python scripts/augment_dataset.py --input_dir data/processed/train --output_dir data/augmented --classes fork_a fork_b knife_a knife_b spoon_a spoon_b
+
+# Or use default classes (same as above)
+python scripts/augment_dataset.py --input_dir data/processed/train --output_dir data/augmented
+```
+
+Note: The script will process all cutlery variants (fork_a, fork_b, knife_a, knife_b, spoon_a, spoon_b) by default.
+
+### Start Training
+
+```bash
+# Train with default configuration
+python scripts/train_type_detector.py --device cuda
+
+# Or train with tuned hyperparameters
 python scripts/train_type_detector.py --device cuda --config results/best_tuning_config.json
 ```
 
@@ -99,6 +190,12 @@ Training outputs will be saved to:
 
 - Model checkpoints: `models/checkpoints/type_detector_best.pth`
 - Training plots and logs: `results/run_YYYYMMDD_HHMMSS/`
+
+### Legacy Note
+
+> ⚠️ The `prepare_dataset.py` script mentioned in older versions is no longer maintained.
+> The current pipeline expects a pre-organized dataset structure as shown above.
+> If you need to split your own dataset, please organize the images manually into train/val/test folders.
 
 ## Evaluation and Testing
 
