@@ -183,67 +183,90 @@ def process_directory(
             variation.save(output_path, "JPEG", quality=95)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate augmented images using Stable Diffusion"
-    )
-    parser.add_argument(
-        "--input-dir",
-        type=str,
-        default="data/processed/train",
-        help="Directory containing training images",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="data/augmented",
-        help="Directory to save augmented images",
-    )
-    parser.add_argument(
-        "--classes",
-        nargs="+",
-        type=str,
-        help="Specific classes to process (e.g. --classes fork knife). If not provided, all classes will be processed.",
-    )
+def main(input_dir=None, output_dir=None, classes=None, num_images=None):
+    """
+    Generate augmented images using Stable Diffusion.
 
-    args = parser.parse_args()
+    Args:
+        input_dir: Input directory containing original images
+        output_dir: Output directory for augmented images
+        classes: List of classes to augment
+        num_images: Number of augmented images to generate per original
+    """
+    if input_dir is None or output_dir is None:  # Called from CLI
+        parser = argparse.ArgumentParser(
+            description="Generate augmented images using Stable Diffusion"
+        )
+        parser.add_argument(
+            "--input_dir",
+            type=Path,
+            required=True,
+            help="Directory containing training images",
+        )
+        parser.add_argument(
+            "--output_dir",
+            type=Path,
+            required=True,
+            help="Directory to save augmented images",
+        )
+        parser.add_argument(
+            "--classes",
+            nargs="+",
+            default=["fork_a", "fork_b", "knife_a", "knife_b", "spoon_a", "spoon_b"],
+            help="Classes to augment (default: fork_a fork_b knife_a knife_b spoon_a spoon_b)",
+        )
+        parser.add_argument(
+            "--num_images",
+            type=int,
+            default=NUM_AUGMENTED_PER_IMAGE,
+            help=f"Number of augmented images per original (default: {NUM_AUGMENTED_PER_IMAGE})",
+        )
+        args = parser.parse_args()
+        input_dir = args.input_dir
+        output_dir = args.output_dir
+        classes = args.classes
+        num_images = args.num_images
 
-    input_dir = Path(args.input_dir)
-    output_dir = Path(args.output_dir)
+    # Convert to Path objects if strings
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir)
 
+    # Validate input directory
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
-    logger.info(f"Using device: {DEVICE}")
-    logger.info(f"Loading Stable Diffusion model: {MODEL_ID}")
+    # Initialize augmenter
+    logger.info("Initializing Stable Diffusion augmenter...")
     augmenter = StableDiffusionAugmenter()
 
-    # Get available classes
-    available_classes = [d.name for d in input_dir.iterdir() if d.is_dir()]
+    # Process each class
+    classes = classes or [
+        "fork_a",
+        "fork_b",
+        "knife_a",
+        "knife_b",
+        "spoon_a",
+        "spoon_b",
+    ]
+    for class_name in classes:
+        class_input_dir = input_dir / class_name
+        class_output_dir = output_dir / class_name
 
-    # Determine which classes to process
-    if args.classes:
-        # Validate requested classes exist
-        invalid_classes = set(args.classes) - set(available_classes)
-        if invalid_classes:
-            raise ValueError(
-                f"Invalid class(es): {', '.join(invalid_classes)}. "
-                f"Available classes: {', '.join(available_classes)}"
+        if not class_input_dir.exists():
+            logger.warning(
+                f"Skipping {class_name}: directory not found at {class_input_dir}"
             )
-        classes_to_process = args.classes
-        logger.info(f"Processing specified classes: {', '.join(classes_to_process)}")
-    else:
-        classes_to_process = available_classes
-        logger.info(f"Processing all classes: {', '.join(classes_to_process)}")
+            continue
 
-    # Process each requested class directory
-    for class_name in classes_to_process:
-        class_dir = input_dir / class_name
-        output_class_dir = output_dir / class_name
-        process_directory(augmenter, class_dir, output_class_dir, class_name)
+        logger.info(f"Processing class: {class_name}")
+        process_directory(
+            augmenter=augmenter,
+            input_dir=class_input_dir,
+            output_dir=class_output_dir,
+            class_name=class_name,
+        )
 
-    logger.info("Augmentation complete! ✨")
-    logger.info(f"Augmented images saved in: {output_dir}")
+    logger.info("✅ Augmentation completed successfully!")
 
 
 if __name__ == "__main__":
