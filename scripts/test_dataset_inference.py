@@ -46,7 +46,11 @@ def load_model(model_path: str, device: torch.device) -> nn.Module:
         device: torch device to load model on
 
     Returns:
-        loaded and configured model
+        Tuple of (loaded model, class names)
+
+    The function handles two checkpoint formats:
+    1. Dictionary with "model_state_dict" key (from trainer)
+    2. Raw state_dict (from hyperparameter tuning)
     """
     model_path = Path(model_path)
     abs_model_path = model_path.resolve()
@@ -84,7 +88,17 @@ def load_model(model_path: str, device: torch.device) -> nn.Module:
 
     # Load trained weights from checkpoint
     checkpoint = torch.load(model_path, map_location=device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+
+    # Detect checkpoint format
+    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+        logger.info("Detected trainer checkpoint format")
+        state_dict = checkpoint["model_state_dict"]
+    else:
+        logger.info("Detected raw state_dict format")
+        state_dict = checkpoint
+
+    # Load state dict and prepare model
+    model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
 
