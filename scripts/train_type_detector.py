@@ -22,14 +22,18 @@ import seaborn as sns
 import torch
 import yaml
 from sklearn.metrics import confusion_matrix, classification_report
-from src.training.trainer import CutleryTrainer
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
+from src.training.trainer import CutleryTrainer
+
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Define data directory
+data_dir = Path("data/processed")
 
 
 def get_class_names(train_dir: str) -> list:
@@ -295,6 +299,7 @@ def create_type_detector_config(args) -> dict:
             },
             "early_stopping": {"enabled": True, "patience": 10, "min_delta": 0.001},
         },
+        "classes": class_names,
     }
 
     return config
@@ -347,13 +352,13 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(
-        level=logging.INFO,  # <--- ändra här!
+        level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     logger = logging.getLogger(__name__)
 
-    logger.info("DEBUG: Starting main()")
+    logger.info("Starting main()")
 
     # Load or create configuration
     if args.config and Path(args.config).exists():
@@ -386,22 +391,18 @@ def main():
     (run_dir / "examples").mkdir(parents=True, exist_ok=True)
     logger.info(f"Saving all results to: {run_dir}")
 
-    # Initialize trainer WITHOUT test_classes (let create_dataloaders handle it!)
+    # Initialize trainer with config and device
     trainer = CutleryTrainer(
-        config=config,
-        model_name="type_detector",
-        device=args.device,
-        train_dir=args.train_dir,
-        val_dir=args.val_dir,
-        test_dir=args.test_dir,
+        config=config, model_name="type_detector", device=args.device
     )
-    logger.info("DEBUG: Created trainer")
+    logger.info("Created trainer")
 
+    # Create model and setup training
     trainer.create_model()
-    logger.info("DEBUG: Created model")
+    logger.info("Created model")
 
     trainer.setup_training()
-    logger.info("DEBUG: Setup training done")
+    logger.info("Setup training done")
 
     # Resume from checkpoint if specified
     if args.resume:
@@ -410,14 +411,14 @@ def main():
 
     try:
         # Create dataloaders
-        logger.info("DEBUG: Creating dataloaders...")
+        logger.info("Creating dataloaders...")
         train_loader, val_loader, test_loader = trainer.create_dataloaders(
             include_mixed=args.mixed_data
         )
 
         # Start training
         logger.info("Starting training...")
-        history = trainer.train(train_loader, val_loader)
+        history = trainer.train(train_loader, val_loader, run_dir=run_dir)
         logger.info("Training completed successfully!")
         logger.info(f"Best validation accuracy: {trainer.best_val_acc:.2f}%")
 
@@ -451,13 +452,8 @@ def main():
         logger.info(f"Model info saved: {model_info_path}")
         logger.info("Training and evaluation completed!")
 
-    except FileNotFoundError as e:
-        logger.error(f"Data not found: {e}")
-        logger.error("Make sure you have:")
-        logger.error("1. Collected images in data/raw/")
-        logger.error("2. Run: python scripts/prepare_dataset.py --create-splits")
     except Exception as e:
-        logger.error(f"Training failed: {e}")
+        logger.error(f"Error during training: {str(e)}")
         raise
 
 

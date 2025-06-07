@@ -523,13 +523,8 @@ class CutleryTrainer:
 
         logger.info(f"Checkpoint loaded from {checkpoint_path}")
 
-    def plot_training_curves(self, run_dir: Optional[Path] = None):
-        """
-        Plot and save training curves.
-
-        Args:
-            run_dir: Optional directory for the current run. If provided, saves per-run plots there.
-        """
+    def plot_training_curves(self):
+        """Plot and save training curves."""
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
         # Loss curves
@@ -552,28 +547,15 @@ class CutleryTrainer:
 
         plt.tight_layout()
 
-        # Save per-run plot if run_dir is provided
-        if run_dir is not None:
-            run_plot_path = run_dir / f"{self.model_name}_training_curves.png"
-            plt.savefig(run_plot_path, dpi=300, bbox_inches="tight")
-            logger.info(f"Training curves saved to run directory: {run_plot_path}")
-
-        # Save latest plot in top-level results directory if configured
-        if self.config.get("training", {}).get("save_latest_training_curve", True):
-            latest_plot_path = (
-                self.results_dir / f"{self.model_name}_latest_training_curves.png"
-            )
-            plt.savefig(latest_plot_path, dpi=300, bbox_inches="tight")
-            logger.info(f"Latest training curves saved: {latest_plot_path}")
-
+        # Save plot
+        plot_path = self.results_dir / f"{self.model_name}_training_curves.png"
+        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
         plt.close()
 
+        logger.info(f"Training curves saved: {plot_path}")
+
     def train(
-        self,
-        train_loader: DataLoader,
-        val_loader: DataLoader,
-        num_epochs: int = None,
-        run_dir: Optional[Path] = None,
+        self, train_loader: DataLoader, val_loader: DataLoader, num_epochs: int = None
     ):
         """
         Main training loop.
@@ -582,7 +564,6 @@ class CutleryTrainer:
             train_loader: Training data loader
             val_loader: Validation data loader
             num_epochs: Number of epochs to train
-            run_dir: Directory for saving per-run results
 
         Returns:
             dict: Training history containing losses and accuracies
@@ -657,7 +638,7 @@ class CutleryTrainer:
         logger.info(f"Best validation accuracy: {self.best_val_acc:.2f}%")
 
         # Plot training curves
-        self.plot_training_curves(run_dir)
+        self.plot_training_curves()
 
         # Save training log
         self.save_training_log()

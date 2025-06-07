@@ -1,0 +1,98 @@
+Cutlery Classifier Project Tree
+============================
+
+├── config/
+│   ├── train_config.yaml
+│   └── train_config_augmented.yaml
+├── data/
+│   ├── augmented/
+│   ├── processed/
+│   │   ├── test/
+│   │   │   ├── fork_a/
+│   │   │   ├── fork_b/
+│   │   │   ├── knife_a/
+│   │   │   ├── knife_b/
+│   │   │   ├── spoon_a/
+│   │   │   └── spoon_b/
+│   │   ├── train/
+│   │   └── val/
+│   └── raw/
+├── docs/
+│   ├── troubleshooting.md
+│   ├── performance_tuning.md
+│   ├── fotograferingsguide.md
+│   ├── image_analysis.md
+│   ├── implementation_roadmap.md
+│   ├── inference_guide.md
+│   └── system_architecture.md
+├── models/
+│   ├── checkpoints/
+│   │   └── type_detector_best.pth
+│   └── exports/
+├── notebooks/
+├── presentation_assets/
+│   ├── gradcam_examples/
+│   └── tuning_plots/
+├── results/
+│   ├── run_20250607_152305/
+│   │   ├── examples_incorrect/
+│   │   ├── examples_correct/
+│   │   ├── type_detector_info.txt
+│   │   ├── confusion_matrix.png
+│   │   ├── test_results.txt
+│   │   ├── accuracy_history.png
+│   │   ├── loss_history.png
+│   │   └── type_detector_training_curves.png
+│   ├── grad_cam/
+│   ├── misclassified_grad_cam/
+│   ├── plots/
+│   └── type_detector_latest_training_curves.png
+├── scripts/
+│   ├── train_type_detector.py
+│   ├── test_dataset_inference.py
+│   ├── plot_optuna_results.py
+│   ├── tune_type_detector.py
+│   ├── run_inference.py
+│   ├── organize_test_images.py
+│   ├── prepare_dataset.py
+│   ├── evaluate_type_detector.py
+│   ├── prepare_test_a_b.py
+│   ├── prepare_val_a_b.py
+│   ├── prepare_split_a_b.py
+│   ├── test_folder_inference.py
+│   ├── export_model.py
+│   ├── deploy.sh
+│   ├── check_augmented_counts.py
+│   ├── augment_dataset.py
+│   ├── analyze_images.py
+│   ├── infer_image.py
+│   ├── validate_dataset.py
+│   ├── create_demo_image.py
+│   ├── evaluate_model.py
+│   └── generate_tree.py
+├── src/
+│   ├── augment/
+│   ├── data/
+│   ├── evaluation/
+│   ├── inference/
+│   ├── models/
+│   ├── pipeline/
+│   │   └── manufacturer/
+│   ├── training/
+│   └── utils/
+├── tests/
+│   └── src/
+│       ├── augment/
+│       ├── data/
+│       ├── evaluation/
+│       ├── inference/
+│       ├── models/
+│       ├── pipeline/
+│       │   └── manufacturer/
+│       ├── training/
+│       └── utils/
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── setup.py
+└── env.example

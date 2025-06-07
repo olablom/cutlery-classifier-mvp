@@ -64,6 +64,18 @@ cp env.example .env
 nano .env
 ```
 
+## Project Structure Note
+
+Some helper scripts have been moved to `scripts/archive/` for cleaner organization. The core pipeline consists of:
+
+- `train_type_detector.py` - Training
+- `test_dataset_inference.py` - Testing
+- `tune_type_detector.py` - Hyperparameter tuning
+- `run_inference.py` - Single image inference
+
+All results are saved in timestamped directories:
+`results/run_YYYYMMDD_HHMMSS/`
+
 ## Training the Model
 
 1. **Prepare your dataset**:
@@ -79,31 +91,27 @@ python scripts/augment_dataset.py --input_dir data/processed --output_dir data/a
 2. **Start training**:
 
 ```bash
-# Train with default parameters
-python scripts/train.py --data_dir data/processed --epochs 50 --batch_size 32 --device cuda
-
-# Train with augmented data
-python scripts/train.py --data_dir data/augmented --epochs 50 --batch_size 32 --device cuda
+# Train with best tuning configuration
+python scripts/train_type_detector.py --device cuda --config results/best_tuning_config.json
 ```
 
 Training outputs will be saved to:
 
-- Model checkpoints: `models/checkpoints/type_detector_best.pth` (best model)
-- Training plots: `results/plots/`
-- Logs: `results/logs/`
+- Model checkpoints: `models/checkpoints/type_detector_best.pth`
+- Training plots and logs: `results/run_YYYYMMDD_HHMMSS/`
 
 ## Evaluation and Testing
 
 1. **Run inference on test dataset**:
 
 ```bash
-python scripts/test_dataset_inference.py --test_dir data/processed/test --model models/checkpoints/type_detector_best.pth
+python scripts/test_dataset_inference.py --device cuda --test_dir data/processed/test --model models/checkpoints/type_detector_best.pth --save-misclassified
 ```
 
-2. **Generate Grad-CAM visualizations**:
+2. **Run inference with Grad-CAM visualization**:
 
 ```bash
-python scripts/grad_cam.py --image path/to/image.jpg --model models/checkpoints/type_detector_best.pth
+python scripts/run_inference.py --device cuda --image path/to/image.jpg --grad-cam
 ```
 
 3. **Run full test suite**:
@@ -112,36 +120,31 @@ python scripts/grad_cam.py --image path/to/image.jpg --model models/checkpoints/
 pytest tests/
 ```
 
-Test outputs will be saved to:
-
-- Confusion matrices: `results/confusion_matrices/`
-- Grad-CAM visualizations: `results/grad_cam/`
-- Test reports: `results/test_reports/`
+Test outputs will be saved to the timestamped run directory:
+`results/run_YYYYMMDD_HHMMSS/`
 
 ## 📤 Outputs
 
-After training and evaluation, the following outputs will be generated:
+After training and evaluation, the following outputs will be generated in `results/run_YYYYMMDD_HHMMSS/`:
 
-- `results/plots/` (Required for presentation)
-  - `confusion_matrix.png` - Model performance visualization
-  - `training_loss.png` - Training convergence plot
-  - `training_accuracy.png` - Accuracy progression
-- `results/grad_cam/`
-  - Grad-CAM visualizations of selected images
-  - Interpretability examples for presentation
-- `results/test_reports/`
-  - Detailed test report (classification report)
-  - Per-class accuracy metrics
-- `demo_images/`
-  - One example image per class (fork_a, fork_b, knife_a, etc.)
-  - Selected Grad-CAM examples for interpretability
-  - Required for project presentation
-- `models/checkpoints/`
-  - `type_detector_best.pth` - Best model checkpoint for inference
-  - `type_detector_latest.pth` - Latest model checkpoint (backup)
-- `models/exports/`
-  - ONNX exported model for future deployment
-  - Optimized for edge device deployment
+- Confusion matrix (`confusion_matrix.png`)
+- Training curves:
+  - `training_loss.png`
+  - `training_accuracy.png`
+- Test results:
+  - `test_results.txt` - Detailed classification report
+  - `examples_correct/` - Correctly classified examples
+  - `examples_incorrect/` - Misclassified examples with Grad-CAM
+- Model information:
+  - `type_detector_info.txt` - Model architecture and parameters
+
+Additional project files:
+
+- `models/checkpoints/type_detector_best.pth` - Best model checkpoint
+- `models/exports/` - ONNX exports (if generated)
+- `demo_images/` - Example images per class (required for presentation)
+
+Note: All results are organized in timestamped run directories for easy tracking and comparison.
 
 ### Export model to ONNX (optional for future deployment):
 
@@ -295,6 +298,30 @@ You can customize the input/output paths:
 ```bash
 python scripts/plot_optuna_results.py --study_db path/to/study.db --output_dir path/to/plots/
 ```
+
+## 🚀 Full Pipeline Example
+
+Here's a complete example of running the full classification pipeline:
+
+### 1️⃣ Train model with best tuning config
+
+```bash
+PYTHONPATH=. python scripts/train_type_detector.py --device cuda --config results/best_tuning_config.json
+```
+
+### 2️⃣ Test entire test set (VG level testing)
+
+```bash
+PYTHONPATH=. python scripts/test_dataset_inference.py --device cuda --test_dir data/processed/test --model models/checkpoints/type_detector_best.pth --save-misclassified
+```
+
+### 3️⃣ Run single image inference with Grad-CAM
+
+```bash
+PYTHONPATH=. python scripts/run_inference.py --device cuda --image "data/processed/test/fork_a/IMG_0941[1].jpg" --grad-cam
+```
+
+All outputs will be saved in timestamped directories under `results/run_YYYYMMDD_HHMMSS/`.
 
 ```
 

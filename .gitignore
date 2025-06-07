@@ -172,16 +172,15 @@ docs/fotograferingsguide.md
 
 # Model files and checkpoints
 models/checkpoints/*
-!models/checkpoints/best_model.pt
+!models/checkpoints/type_detector_best.pth
 models/exports/
 *.pt
 *.pth
 *.onnx
 
 # Results and logs
-results/*
-!results/grad_cam/
-!results/confusion_matrices/
+results/run_*/
+!results/run_latest/
 results/optuna_study.db
 results/optuna_plots/
 logs/
@@ -253,4 +252,13 @@ mlruns/
 
 # Optuna files
 results/optuna_study.db
-results/optuna_plots/ 
+results/optuna_plots/
+
+# Archive directories
+scripts/archive/
+results/archive/
+tests/old_src/
+
+# Generated outputs
+results/grad_cam/
+results/misclassified_grad_cam/ 
