@@ -253,6 +253,49 @@ MIT License - See LICENSE file for details.
 - ResNet architecture: [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
 - Grad-CAM visualization: [Grad-CAM: Visual Explanations from Deep Networks](https://arxiv.org/abs/1610.02391)
 
+## Hyperparameter Tuning
+
+The project includes Optuna-based hyperparameter optimization. To run the tuning process:
+
+```bash
+python scripts/tune_type_detector.py --n_trials 50
+```
+
+This will:
+
+1. Run 50 trials of hyperparameter optimization
+2. Save the best model as `models/checkpoints/type_detector_best_tuned.pth`
+3. Generate visualization plots in `results/optuna_plots/`
+4. Save the best configuration to `results/best_tuning_config.json`
+
+Parameters tuned:
+
+- Learning rate
+- Weight decay
+- Dropout rate
+- Optimizer choice (Adam vs SGD)
+- Momentum (when using SGD)
+
+## Plotting Optuna Results
+
+After running hyperparameter optimization, you can generate visualization plots using:
+
+```bash
+python scripts/plot_optuna_results.py
+```
+
+The script uses Matplotlib to generate the following plots in `results/optuna_plots/`:
+
+- `optimization_history.png`: Shows the optimization progress
+- `param_importances.png`: Shows the relative importance of each parameter
+- `parallel_coordinates.png`: Shows parameter relationships (if available)
+
+You can customize the input/output paths:
+
+```bash
+python scripts/plot_optuna_results.py --study_db path/to/study.db --output_dir path/to/plots/
+```
+
 ```
 
 ```

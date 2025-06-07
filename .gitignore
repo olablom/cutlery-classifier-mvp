@@ -182,6 +182,8 @@ models/exports/
 results/*
 !results/grad_cam/
 !results/confusion_matrices/
+results/optuna_study.db
+results/optuna_plots/
 logs/
 wandb/
 mlruns/
@@ -247,4 +249,8 @@ mlruns/
 *.bmp
 *.tiff
 *.webp
-!demo_images/*.* 
+!demo_images/*.*
+
+# Optuna files
+results/optuna_study.db
+results/optuna_plots/ 
