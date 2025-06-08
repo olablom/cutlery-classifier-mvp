@@ -1,152 +1,89 @@
 # Cutlery Classifier MVP
 
-## Project Overview
+A production-ready computer vision pipeline for classifying cutlery types (fork, knife, spoon) using deep learning.
 
-An advanced deep learning system for automated cutlery classification, achieving production-ready performance with ResNet18 architecture. The system demonstrates perfect accuracy on the test set while maintaining high throughput and robustness to real-world variations.
+## 🎯 Features
 
-### Key Features
+✅ ResNet18-based classifier with grayscale pipeline  
+✅ Real-time inference (<200ms on CUDA)  
+✅ Production-grade data augmentation  
+✅ Grad-CAM visualization for model explainability  
+✅ ONNX export ready for edge deployment  
+✅ Comprehensive test suite with stress testing  
+✅ 100% accuracy on validation and test sets
 
-- High-accuracy cutlery classification (fork, knife, spoon)
-- Production-ready validation pipeline
-- Comprehensive stress testing suite
-- Real-time inference capabilities
-- Explainable AI with Grad-CAM visualizations
-
-## Technical Architecture
-
-- **Framework**: PyTorch
-- **Base Model**: ResNet18 (transfer learning)
-- **Input**: 224x224 grayscale images
-- **Output**: 3-class classification
-- **Performance**: 120,000+ predictions/minute
-- **Export Format**: ONNX for edge deployment
-
-## Setup Instructions
+## 🚀 Quick Start
 
 ### Prerequisites
 
-```bash
-# Required system packages
-python >= 3.8
-CUDA >= 11.0 (for GPU support)
-```
+- Python 3.8+
+- CUDA-capable GPU (for optimal performance)
+- PyTorch 2.0+
 
 ### Installation
 
-1. Clone the repository:
-
 ```bash
+# Clone the repository
 git clone https://github.com/yourusername/cutlery-classifier-mvp.git
 cd cutlery-classifier-mvp
+
+# Install package
+pip install -e .
 ```
 
-2. Create and activate virtual environment:
-
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# OR
-.\venv\Scripts\activate  # Windows
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-### Training
-
-```bash
-# Run full training pipeline
-python scripts/full_pipeline.py --device cuda
-
-# Train with specific configuration
-python scripts/train_type_detector.py --device cuda --config config/model_config.yaml
-```
-
-### Inference
+### Running Inference
 
 ```bash
 # Single image inference
-python scripts/run_inference.py --device cuda --image path/to/image.jpg
+PYTHONPATH=src python scripts/run_inference.py --device cuda --model models/checkpoints/type_detector_best.pth --image path/to/your/image.jpg
 
 # With Grad-CAM visualization
-python scripts/run_inference.py --device cuda --image path/to/image.jpg --grad-cam
+PYTHONPATH=src python scripts/run_inference.py --device cuda --model models/checkpoints/type_detector_best.pth --image path/to/your/image.jpg --grad-cam
 ```
 
-### Testing
+## 📊 Performance
 
-```bash
-# Run complete test suite
-pytest tests/
+| Metric                | Value  |
+| --------------------- | ------ |
+| Accuracy (Test Set)   | 100%   |
+| Inference Time (CUDA) | <200ms |
+| Model Size            | 44.7MB |
+| Stress Test Accuracy  | >90%   |
 
-# Run specific test category
-pytest tests/test_inference.py
-```
-
-## Project Structure
+## 🛠️ Project Structure
 
 ```
 cutlery-classifier-mvp/
-├── config/                  # Configuration files
-├── scripts/                 # Training and inference scripts
-│   ├── run_inference.py    # Production inference script
-│   ├── train_type_detector.py  # Training script
-│   └── test_dataset_inference.py  # Dataset validation
-├── src/                    # Source code
-│   ├── data/              # Data loading and preprocessing
-│   ├── models/            # Model architecture and factory
-│   ├── training/          # Training utilities
-│   ├── evaluation/        # Evaluation metrics
-│   └── inference/         # Inference pipeline
-└── tests/                 # Unit tests
+├── config/               # Model and training configurations
+├── scripts/             # Production-ready training and inference scripts
+├── src/                 # Core implementation
+│   ├── augment/        # Data augmentation pipeline
+│   ├── evaluation/     # Model evaluation and Grad-CAM
+│   ├── inference/      # Inference pipeline
+│   ├── models/         # Model architecture
+│   └── training/       # Training pipeline
+└── tests/              # Comprehensive test suite
 ```
 
-## Documentation
+## 🔬 Model Architecture
 
-Comprehensive documentation is available covering:
+- Base: ResNet18 (pretrained)
+- Input: Grayscale images (224x224)
+- Output: 3 classes (fork, knife, spoon)
+- Feature Extraction: Modified conv1 for grayscale
+- Training: Early stopping, learning rate scheduling
 
-- Technical Implementation Guide
-- Performance Analysis
-- Testing Reports
-- Grad-CAM Visualizations
-- Production Deployment Guide
+## 📈 Project Status
 
-For access to the complete documentation package, please contact the project maintainer.
+✅ Full pipeline tested and verified  
+✅ Production-ready inference  
+✅ Comprehensive documentation  
+✅ Ready for deployment/integration
 
-## Performance Metrics
-
-### Model Performance
-
-- **Test Accuracy**: 100%
-- **Validation Accuracy**: 100%
-- **Inference Speed**: <10ms per prediction
-- **Model Size**: 43MB
-
-### Stress Test Results
-
-- **Noise Tolerance**: 93.33% accuracy
-- **Blur Resistance**: 100% accuracy
-- **Rotation Invariance**: 100% accuracy
-
-## Development Process
-
-The project follows professional software development practices:
-
-- Modern Python packaging (pyproject.toml)
-- Comprehensive testing suite
-- Clear code documentation
-- Regular performance benchmarking
-- Explainable AI integration
-
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🤝 Contributing
 
-- PyTorch team for the excellent deep learning framework
-- ResNet authors for the backbone architecture
+Contributions are welcome! Please feel free to submit a Pull Request.
