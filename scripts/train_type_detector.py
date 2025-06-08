@@ -11,29 +11,44 @@ Usage:
     python scripts/train_type_detector.py --epochs 20 --batch-size 16
 """
 
+import os
+import sys
+import json
 import argparse
 import logging
-import sys
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch
+from torch.utils.data import DataLoader
+import torchvision.transforms as T
+from torchvision.datasets import ImageFolder
 import yaml
 from sklearn.metrics import confusion_matrix, classification_report
 
-# Add project root to path for imports
+# Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.training.trainer import CutleryTrainer
+from src.models.factory import create_model
 
-# Setup logging
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
+# Constants
+CLASSES = ["fork", "knife", "spoon"]
+DEFAULT_TEST_IMAGE = "data/simplified/test/fork/IMG_0941[1]_fork_a.jpg"
+VERSION = "1.0.0"
+
 # Define data directory
-data_dir = Path("data/processed")
+data_dir = Path("data/simplified")
 
 
 def get_class_names(train_dir: str) -> list:
@@ -245,216 +260,106 @@ def evaluate_model(trainer, test_loader, save_dir):
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+        return yaml.safe_load(f)
 
 
 def create_type_detector_config(args) -> dict:
-    """Create configuration for type detector training."""
-    # Get class names from training directory
-    train_dir = args.train_dir if args.train_dir else "data/processed/train"
-    class_names = get_class_names(train_dir)
-    num_classes = len(class_names)
-
-    logger.info(f"Classes detected: {class_names}")
-    logger.info(f"num_classes set to: {num_classes}")
-
+    """Create configuration dictionary from command line arguments."""
     config = {
         "model": {
             "architecture": "resnet18",
-            "num_classes": num_classes,
+            "num_classes": len(CLASSES),
             "pretrained": True,
-            "grayscale": True,
-            "freeze_backbone": False,
-            "dropout_rate": 0.5,
-        },
-        "data": {
-            "image_size": [320, 320],
-            "augmentation": {
-                "horizontal_flip": 0.5,
-                "rotation_degrees": 15,
-                "color_jitter": {
-                    "brightness": 0.2,
-                    "contrast": 0.2,
-                    "saturation": 0.2,
-                    "hue": 0.1,
-                },
-                "gaussian_blur": 0.1,
-                "random_crop_scale": [0.8, 1.0],
-                "random_crop_ratio": [0.9, 1.1],
-            },
         },
         "training": {
-            "batch_size": args.batch_size,
-            "num_epochs": args.epochs,
-            "learning_rate": args.learning_rate,
-            "weight_decay": 1e-4,
-            "optimizer": "adam",
-            "num_workers": 4,
-            "scheduler": {
-                "enabled": True,
-                "type": "step",
-                "step_size": 15,
-                "gamma": 0.1,
-            },
-            "early_stopping": {"enabled": True, "patience": 10, "min_delta": 0.001},
+            "num_epochs": args.epochs if args.epochs else 30,
+            "batch_size": args.batch_size if args.batch_size else 32,
+            "learning_rate": 0.001,
+            "weight_decay": 0.0001,
+            "momentum": 0.9,
+            "mixed_data": args.mixed_data,
         },
-        "classes": class_names,
+        "data": {
+            "train_dir": str(data_dir / "train"),
+            "val_dir": str(data_dir / "val"),
+            "test_dir": str(data_dir / "test"),
+            "input_size": 224,
+            "num_workers": 4,
+        },
     }
-
     return config
 
 
 def main():
+    """Main training function."""
     parser = argparse.ArgumentParser(description="Train cutlery type detector")
     parser.add_argument(
-        "--config", type=str, default=None, help="Path to config YAML file"
+        "--config",
+        type=str,
+        help="Path to config file",
     )
     parser.add_argument(
-        "--epochs", type=int, default=30, help="Number of training epochs"
+        "--device",
+        type=str,
+        default="cuda" if torch.cuda.is_available() else "cpu",
+        help="Device to train on (cuda/cpu)",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=32, help="Batch size for training"
+        "--epochs",
+        type=int,
+        help="Number of epochs to train",
     )
     parser.add_argument(
-        "--learning-rate", type=float, default=0.001, help="Learning rate"
-    )
-    parser.add_argument(
-        "--device", type=str, default=None, help="Device to use (cuda/cpu)"
-    )
-    parser.add_argument(
-        "--resume", type=str, default=None, help="Path to checkpoint to resume from"
+        "--batch-size",
+        type=int,
+        help="Training batch size",
     )
     parser.add_argument(
         "--mixed-data",
         action="store_true",
-        help="Include mixed cutlery images in training",
+        help="Use mixed real + augmented data",
     )
-    parser.add_argument(
-        "--train-dir",
-        type=str,
-        default="data/processed/train",
-        help="Path to training data directory",
-    )
-    parser.add_argument(
-        "--val-dir",
-        type=str,
-        default="data/processed/val",
-        help="Path to validation data directory",
-    )
-    parser.add_argument(
-        "--test-dir",
-        type=str,
-        default="data/processed/test",
-        help="Path to test data directory",
-    )
-
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-    logger = logging.getLogger(__name__)
-
-    logger.info("Starting main()")
-
-    # Load or create configuration
-    if args.config and Path(args.config).exists():
-        logger.info(f"Loading config from {args.config}")
+    # Load or create config
+    if args.config:
         config = load_config(args.config)
-
-        # Override with command line arguments
-        if args.epochs != 30:
-            config["training"]["num_epochs"] = args.epochs
-        if args.batch_size != 32:
-            config["training"]["batch_size"] = args.batch_size
-        if args.learning_rate != 0.001:
-            config["training"]["learning_rate"] = args.learning_rate
     else:
-        logger.info("Creating default configuration")
         config = create_type_detector_config(args)
 
-    logger.info("Configuration:")
-    logger.info(f"  Model: {config['model']['architecture']}")
-    logger.info(f"  Classes: {config['model']['num_classes']}")
-    logger.info(f"  Epochs: {config['training']['num_epochs']}")
-    logger.info(f"  Batch size: {config['training']['batch_size']}")
-    logger.info(f"  Learning rate: {config['training']['learning_rate']}")
-
-    # Prepare run output directory
-    run_dir = (
-        project_root / "results" / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    )
+    # Create results directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = Path("results") / f"train_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "examples").mkdir(parents=True, exist_ok=True)
-    logger.info(f"Saving all results to: {run_dir}")
 
-    # Initialize trainer with config and device
-    trainer = CutleryTrainer(
-        config=config, model_name="type_detector", device=args.device
-    )
-    logger.info("Created trainer")
+    # Save config
+    config_path = run_dir / "train_config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
 
-    # Create model and setup training
+    # Initialize trainer
+    trainer = CutleryTrainer(config)
+
+    # Create and setup model
     trainer.create_model()
-    logger.info("Created model")
-
     trainer.setup_training()
-    logger.info("Setup training done")
 
-    # Resume from checkpoint if specified
-    if args.resume:
-        logger.info(f"Resuming from checkpoint: {args.resume}")
-        trainer.load_checkpoint(args.resume)
+    # Create dataloaders
+    train_loader, val_loader, test_loader = trainer.create_dataloaders(
+        include_mixed=args.mixed_data
+    )
 
-    try:
-        # Create dataloaders
-        logger.info("Creating dataloaders...")
-        train_loader, val_loader, test_loader = trainer.create_dataloaders(
-            include_mixed=args.mixed_data
-        )
+    # Train model
+    history = trainer.train(train_loader, val_loader)
 
-        # Start training
-        logger.info("Starting training...")
-        history = trainer.train(train_loader, val_loader, run_dir=run_dir)
-        logger.info("Training completed successfully!")
-        logger.info(f"Best validation accuracy: {trainer.best_val_acc:.2f}%")
+    # Plot training history
+    plot_training_history(history, run_dir)
 
-        # Plot training history
-        logger.info("Generating training plots...")
-        plot_training_history(history, run_dir)
+    # Evaluate on test set
+    evaluate_model(trainer, test_loader, run_dir)
 
-        # Evaluate on test set
-        logger.info("Evaluating model on test set...")
-        test_results = evaluate_model(trainer, test_loader, run_dir)
-
-        # Save final model info
-        model_info_path = run_dir / "type_detector_info.txt"
-        with open(model_info_path, "w") as f:
-            f.write("Type Detector Model Information\n")
-            f.write("================================\n\n")
-            f.write(f"Architecture: {config['model']['architecture']}\n")
-            f.write(f"Classes: {trainer.class_names}\n")
-            f.write(f"Best Validation Accuracy: {trainer.best_val_acc:.2f}%\n")
-            f.write(f"Test Set Accuracy: {test_results['accuracy']:.2f}%\n")
-            f.write(f"Total Epochs: {trainer.current_epoch + 1}\n")
-            f.write(f"Device: {trainer.device}\n")
-            f.write("\nPer-Class Test Metrics:\n")
-            for class_name in trainer.test_classes:
-                metrics = test_results["report"][class_name]
-                f.write(f"\n{class_name}:\n")
-                f.write(f"  Precision: {metrics['precision']:.3f}\n")
-                f.write(f"  Recall: {metrics['recall']:.3f}\n")
-                f.write(f"  F1-Score: {metrics['f1-score']:.3f}\n")
-
-        logger.info(f"Model info saved: {model_info_path}")
-        logger.info("Training and evaluation completed!")
-
-    except Exception as e:
-        logger.error(f"Error during training: {str(e)}")
-        raise
+    logger.info("✅ Training completed successfully!")
+    logger.info(f"Results saved to: {run_dir}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,27 @@
+model:
+  architecture: resnet18
+  num_classes: 3
+  pretrained: true
+  grayscale: true
+  freeze_backbone: false
+
+training:
+  num_epochs: 1
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  momentum: 0.9
+  mixed_data: false
+
+data:
+  processed_data_path: data/simplified
+  train_dir: data/simplified/train
+  val_dir: data/simplified/val
+  test_dir: data/simplified/test
+  input_size: 224
+  num_workers: 4
+
+classes:
+  - fork
+  - knife
+  - spoon

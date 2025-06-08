@@ -20,14 +20,12 @@ from typing import Dict, List, Tuple, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
+from torchvision import transforms, models
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
-
-from src.models.factory import create_model
 
 
 # Configure logging
@@ -37,59 +35,58 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_path: str, device: torch.device) -> Tuple[nn.Module, List[str]]:
-    """
-    Load the trained ResNet18 model and class names.
+def count_parameters(model):
+    """Count total and trainable parameters in a model."""
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return total_params, trainable_params
+
+
+def load_model(model_path: str, device: str) -> Tuple[nn.Module, List[str]]:
+    """Load the model.
 
     Args:
-        model_path: path to model checkpoint
-        device: torch device to load model on
+        model_path: Path to model checkpoint
+        device: Device to load model on
 
     Returns:
-        model: loaded and configured model
-        class_names: list of class names
+        tuple: (model, class_names)
     """
-    model_path = Path(model_path)
-    abs_model_path = model_path.resolve()
-    logger.info(f"Loading model from: {abs_model_path}")
+    # Load model checkpoint
+    checkpoint_path = Path("models/checkpoints/type_detector_best.pth")
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Model checkpoint not found at {checkpoint_path}")
 
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model not found at {model_path}")
+    logger.info(f"Loading model from: {checkpoint_path}")
+    logger.info("Using 3 simplified classes: fork, knife, spoon")
 
-    # Try to load class names from training data directory
-    data_dirs = [Path("data/processed/train"), Path("data/augmented")]
+    # Create model
+    logger.info("Creating resnet18 model with 3 classes")
+    logger.info("Pretrained: True, Grayscale: True, Freeze: False")
 
-    class_names = None
-    for data_dir in data_dirs:
-        if data_dir.exists():
-            class_names = sorted([d.name for d in data_dir.iterdir() if d.is_dir()])
-            if class_names:
-                break
+    model = models.resnet18(pretrained=True)
+    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    model.fc = nn.Sequential(nn.Dropout(p=0.5), nn.Linear(model.fc.in_features, 3))
 
-    if not class_names:
-        raise RuntimeError(
-            "Could not find class names in data/processed/train or data/augmented"
-        )
-
-    num_classes = len(class_names)
-    logger.info(f"Found {num_classes} classes: {', '.join(class_names)}")
-
-    # Create model using factory with same config as training
-    model = create_model(
-        model_config="resnet18",
-        num_classes=num_classes,
-        pretrained=True,
-        grayscale=True,
-        freeze_backbone=False,
+    # Count parameters
+    total_params, trainable_params = count_parameters(model)
+    logger.info(
+        f"Model created: {total_params:,} total params, {trainable_params:,} trainable"
     )
 
-    # Load trained weights from checkpoint
-    checkpoint = torch.load(model_path, map_location=device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    # Load checkpoint
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+        state_dict = checkpoint["model_state_dict"]
+    else:
+        state_dict = checkpoint
+
+    model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
 
-    logger.info(f"Model loaded successfully with {num_classes} output classes")
+    class_names = ["fork", "knife", "spoon"]
+    logger.info(f"Model loaded successfully with {len(class_names)} output classes")
     return model, class_names
 
 

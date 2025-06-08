@@ -10,6 +10,7 @@ An advanced deep learning system for automated cutlery classification, achieving
 - Production-ready validation pipeline
 - Comprehensive stress testing suite
 - Real-time inference capabilities
+- Explainable AI with Grad-CAM visualizations
 
 ## Technical Architecture
 
@@ -18,6 +19,7 @@ An advanced deep learning system for automated cutlery classification, achieving
 - **Input**: 224x224 grayscale images
 - **Output**: 3-class classification
 - **Performance**: 120,000+ predictions/minute
+- **Export Format**: ONNX for edge deployment
 
 ## Setup Instructions
 
@@ -62,7 +64,7 @@ pip install -r requirements.txt
 python scripts/full_pipeline.py --device cuda
 
 # Train with specific configuration
-python scripts/train_type_detector.py --device cuda --config configs/model_config.json
+python scripts/train_type_detector.py --device cuda --config config/model_config.yaml
 ```
 
 ### Inference
@@ -75,27 +77,45 @@ python scripts/run_inference.py --device cuda --image path/to/image.jpg
 python scripts/run_inference.py --device cuda --image path/to/image.jpg --grad-cam
 ```
 
-### Production Validation
+### Testing
 
 ```bash
-# Run complete validation suite
-python scripts/production_validation.py --device cuda
+# Run complete test suite
+pytest tests/
+
+# Run specific test category
+pytest tests/test_inference.py
 ```
 
 ## Project Structure
 
 ```
 cutlery-classifier-mvp/
-├── configs/                 # Configuration files
+├── config/                  # Configuration files
 ├── scripts/                 # Training and inference scripts
-├── src/                     # Source code
-│   ├── data/               # Data loading and preprocessing
-│   ├── models/             # Model architecture and factory
-│   ├── training/           # Training utilities
-│   ├── evaluation/         # Evaluation metrics
-│   └── inference/          # Inference pipeline
-└── tests/                  # Unit tests
+│   ├── run_inference.py    # Production inference script
+│   ├── train_type_detector.py  # Training script
+│   └── test_dataset_inference.py  # Dataset validation
+├── src/                    # Source code
+│   ├── data/              # Data loading and preprocessing
+│   ├── models/            # Model architecture and factory
+│   ├── training/          # Training utilities
+│   ├── evaluation/        # Evaluation metrics
+│   └── inference/         # Inference pipeline
+└── tests/                 # Unit tests
 ```
+
+## Documentation
+
+Comprehensive documentation is available covering:
+
+- Technical Implementation Guide
+- Performance Analysis
+- Testing Reports
+- Grad-CAM Visualizations
+- Production Deployment Guide
+
+For access to the complete documentation package, please contact the project maintainer.
 
 ## Performance Metrics
 
@@ -116,18 +136,11 @@ cutlery-classifier-mvp/
 
 The project follows professional software development practices:
 
-- Agile development methodology
+- Modern Python packaging (pyproject.toml)
 - Comprehensive testing suite
 - Clear code documentation
 - Regular performance benchmarking
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- Explainable AI integration
 
 ## License
 
@@ -137,4 +150,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - PyTorch team for the excellent deep learning framework
 - ResNet authors for the backbone architecture
-- Course supervisors for guidance and support

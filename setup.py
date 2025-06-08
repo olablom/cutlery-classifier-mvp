@@ -1,9 +1,9 @@
-from setuptools import setup, find_namespace_packages
+from setuptools import setup, find_packages
 
 setup(
     name="cutlery-classifier",
     version="0.1.0",
-    packages=find_namespace_packages(where="src", include=["*"]),
+    packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
         "torch>=1.9.0",

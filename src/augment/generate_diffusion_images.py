@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 FINAL_SIZE = 320  # Size for saved images
 IMAGE_SIZE = 512  # Stable Diffusion works best with 512x512
 NUM_INFERENCE_STEPS = 50
+global NUM_AUGMENTED_PER_IMAGE
 NUM_AUGMENTED_PER_IMAGE = 3
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_ID = "runwayml/stable-diffusion-v1-5"
@@ -193,6 +194,8 @@ def main(input_dir=None, output_dir=None, classes=None, num_images=None):
         classes: List of classes to augment
         num_images: Number of augmented images to generate per original
     """
+    global NUM_AUGMENTED_PER_IMAGE  # Only one global declaration needed
+
     if input_dir is None or output_dir is None:  # Called from CLI
         parser = argparse.ArgumentParser(
             description="Generate augmented images using Stable Diffusion"
@@ -230,6 +233,11 @@ def main(input_dir=None, output_dir=None, classes=None, num_images=None):
     # Convert to Path objects if strings
     input_dir = Path(input_dir)
     output_dir = Path(output_dir)
+
+    # Set number of augmented images if provided
+    if num_images is not None:
+        NUM_AUGMENTED_PER_IMAGE = num_images
+        logger.info(f"Setting number of augmented images per original to: {num_images}")
 
     # Validate input directory
     if not input_dir.exists():

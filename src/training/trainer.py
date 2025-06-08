@@ -74,7 +74,7 @@ class CutleryTrainer:
     """
     Comprehensive trainer for cutlery classification models.
 
-    Supports both type detection with manufacturer variants (fork_a/fork_b/knife_a/knife_b/spoon_a/spoon_b)
+    Supports both type detection with manufacturer variants (fork_a/b, knife_a/b, spoon_a/b)
     and future manufacturer-specific classification.
     """
 
@@ -103,9 +103,19 @@ class CutleryTrainer:
         self.project_root = Path(__file__).parent.parent.parent
         logger.info(f"Project root set to: {self.project_root}")
 
-        self.train_dir = Path(train_dir) if train_dir else None
-        self.val_dir = Path(val_dir) if val_dir else None
-        self.test_dir = Path(test_dir) if test_dir else None
+        # Use data paths from config if not explicitly provided
+        data_config = config.get("data", {})
+        self.processed_data_path = Path(
+            data_config.get("processed_data_path", "data/processed")
+        )
+
+        self.train_dir = (
+            Path(train_dir) if train_dir else self.processed_data_path / "train"
+        )
+        self.val_dir = Path(val_dir) if val_dir else self.processed_data_path / "val"
+        self.test_dir = (
+            Path(test_dir) if test_dir else self.processed_data_path / "test"
+        )
 
         # Setup device
         if device is None:
@@ -114,10 +124,9 @@ class CutleryTrainer:
             self.device = torch.device(device)
 
         logger.info(f"Using device: {self.device}")
-        if train_dir:
-            logger.info(f"Using custom train directory: {train_dir}")
-        if val_dir:
-            logger.info(f"Using custom validation directory: {val_dir}")
+        logger.info(f"Using train directory: {self.train_dir}")
+        logger.info(f"Using validation directory: {self.val_dir}")
+        logger.info(f"Using test directory: {self.test_dir}")
 
         # Initialize components
         self.model = None
@@ -133,17 +142,16 @@ class CutleryTrainer:
         self.train_accs = []
         self.val_accs = []
 
+        # Classes from config
+        self.classes = config.get("classes", [])
+        if not self.classes:
+            raise ValueError("No classes defined in config")
+
         # Paths
         self.setup_paths()
-        self.test_dir = (
-            Path(test_dir)
-            if test_dir
-            else self.project_root / "data" / "processed" / "test"
-        )
 
     def setup_paths(self):
         """Setup paths for saving models, logs, and results."""
-        self.project_root = Path(__file__).parent.parent.parent
         self.models_dir = self.project_root / "models" / "checkpoints"
         self.results_dir = self.project_root / "results"
         self.logs_dir = self.project_root / "results" / "logs"
@@ -216,7 +224,7 @@ class CutleryTrainer:
             Tuple of (train_loader, val_loader, test_loader)
         """
         data_config = self.config.get("data", {})
-        data_dir = self.project_root / "data" / "processed"
+        data_dir = self.processed_data_path
         mixed_dir = self.project_root / "data" / "mixed"
 
         # Use custom directories if provided, otherwise use defaults

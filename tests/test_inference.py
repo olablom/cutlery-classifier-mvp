@@ -1,5 +1,5 @@
-import pytest
-from src.inference.predictor import CutleryPredictor
+import pytest  # noqa: F401
+from src.inference.inferencer import CutleryPredictor
 from src.models.factory import create_model
 
 

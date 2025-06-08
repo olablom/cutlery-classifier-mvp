@@ -3,7 +3,7 @@
 # Data Configuration
 data:
   raw_data_path: "data/raw"
-  processed_data_path: "data/processed"
+  processed_data_path: "data/simplified"
   augmented_data_path: "data/augmented"
   image_size: [320, 320]
   num_workers: 4
@@ -16,7 +16,7 @@ data:
 model:
   architecture: "resnet18" # Options: resnet18, mobilenet_v2
   pretrained: true
-  num_classes: 6 # Updated: fork_a, fork_b, knife_a, knife_b, spoon_a, spoon_b
+  num_classes: 3 # Updated: fork, knife, spoon
   dropout_rate: 0.5
   freeze_backbone: false # Set to true for feature extraction only
   input_channels: 1 # Grayscale input
@@ -58,14 +58,11 @@ paths:
   results_dir: "results"
   logs_dir: "logs"
 
-# Class Names - Type Detection (Stage 1)
+# Class Names - Type Detection
 classes:
-  - "fork_a"
-  - "fork_b"
-  - "knife_a"
-  - "knife_b"
-  - "spoon_a"
-  - "spoon_b"
+  - "fork"
+  - "knife"
+  - "spoon"
 
 # Manufacturer Classes (for future Stage 2 models)
 manufacturers:

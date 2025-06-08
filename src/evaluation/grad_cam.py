@@ -4,10 +4,16 @@ Based on the paper "Grad-CAM: Visual Explanations from Deep Networks via Gradien
 https://arxiv.org/abs/1610.02391
 """
 
+import logging
 import torch
 import torch.nn.functional as F
 import numpy as np
 from typing import List, Optional, Tuple
+from PIL import Image
+import matplotlib.pyplot as plt
+import torchvision.transforms as T
+
+logger = logging.getLogger(__name__)
 
 
 class GradCAM:
@@ -17,32 +23,28 @@ class GradCAM:
     """
 
     def __init__(self, model: torch.nn.Module, target_layer: torch.nn.Module):
+        """Initialize GradCAM.
+
+        Args:
+            model: The model to analyze
+            target_layer: The target layer to compute GradCAM for
+        """
         self.model = model
         self.target_layer = target_layer
-        self.gradients: List[torch.Tensor] = []
-        self.activations: List[torch.Tensor] = []
+        self.gradients = None
+        self.activations = None
 
         # Register hooks
-        self.register_hooks()
+        target_layer.register_forward_hook(self._save_activation)
+        target_layer.register_backward_hook(self._save_gradient)
 
-    def register_hooks(self):
-        """Register forward and backward hooks on the target layer."""
+    def _save_activation(self, module, input, output):
+        """Save activations during forward pass."""
+        self.activations = output.detach()
 
-        def forward_hook(
-            module: torch.nn.Module, input: Tuple[torch.Tensor], output: torch.Tensor
-        ):
-            self.activations.append(output)
-
-        def backward_hook(
-            module: torch.nn.Module,
-            grad_input: Tuple[torch.Tensor],
-            grad_output: Tuple[torch.Tensor],
-        ):
-            self.gradients.append(grad_output[0])
-
-        # Register the hooks
-        self.target_layer.register_forward_hook(forward_hook)
-        self.target_layer.register_backward_hook(backward_hook)
+    def _save_gradient(self, module, grad_input, grad_output):
+        """Save gradients during backward pass."""
+        self.gradients = grad_output[0].detach()
 
     def __call__(
         self, input_tensor: torch.Tensor, target_class: Optional[int] = None
@@ -57,42 +59,55 @@ class GradCAM:
         Returns:
             Numpy array containing the Grad-CAM heatmap
         """
-        # Clear any previous gradients and activations
-        self.gradients = []
-        self.activations = []
-
         # Forward pass
-        output = self.model(input_tensor)
+        model_output = self.model(input_tensor)
 
         if target_class is None:
-            target_class = output.argmax(dim=1).item()
+            target_class = torch.argmax(model_output)
 
-        # Zero all gradients
+        # Zero gradients
         self.model.zero_grad()
 
-        # Backward pass for target class
-        target = output[0, target_class]
-        target.backward()
+        # Backward pass
+        class_loss = model_output[0, target_class]
+        class_loss.backward()
 
-        # Get gradients and activations
-        gradients = self.gradients[0]
-        activations = self.activations[0]
+        # Generate GradCAM
+        pooled_gradients = torch.mean(self.gradients, dim=[0, 2, 3])
+        for i in range(self.activations.shape[1]):
+            self.activations[:, i, :, :] *= pooled_gradients[i]
 
-        # Global average pooling of gradients
-        weights = torch.mean(gradients, dim=(2, 3), keepdim=True)
+        heatmap = torch.mean(self.activations, dim=1).squeeze()
+        heatmap = torch.relu(heatmap)
+        heatmap = heatmap / torch.max(heatmap)
 
-        # Weight the activations by the gradients
-        cam = torch.sum(weights * activations, dim=1, keepdim=True)
+        return heatmap.cpu().numpy()
 
-        # Apply ReLU and normalize
-        cam = F.relu(cam)
-        cam = F.interpolate(
-            cam, size=input_tensor.shape[2:], mode="bilinear", align_corners=False
-        )
+    def overlay_heatmap(self, heatmap, original_image, alpha=0.5):
+        """Overlay heatmap on original image.
 
-        # Normalize to [0, 1]
-        cam = cam - cam.min()
-        cam = cam / (cam.max() + 1e-8)
+        Args:
+            heatmap: GradCAM heatmap
+            original_image: Original image
+            alpha: Transparency of heatmap overlay
 
-        # Convert to numpy array
-        return cam[0, 0].detach().cpu().numpy()
+        Returns:
+            PIL.Image: Image with overlaid heatmap
+        """
+        # Resize heatmap to match image size
+        heatmap = Image.fromarray(np.uint8(255 * heatmap))
+        heatmap = heatmap.resize(original_image.size, Image.LANCZOS)
+        heatmap = np.array(heatmap)
+
+        # Apply colormap
+        colormap = plt.get_cmap("jet")
+        heatmap = colormap(heatmap)[:, :, :3]
+        heatmap = np.uint8(255 * heatmap)
+
+        # Convert original image to numpy array
+        original_array = np.array(original_image)
+
+        # Overlay heatmap
+        overlaid = np.uint8(original_array * (1 - alpha) + heatmap * alpha)
+
+        return Image.fromarray(overlaid)

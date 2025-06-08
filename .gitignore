@@ -314,4 +314,68 @@ tests/old_src/
 
 # Generated outputs
 results/grad_cam/
-results/misclassified_grad_cam/ 
+results/misclassified_grad_cam/ presentation/
+presentation_ready/
+
+# Additional log files
+pipeline.log
+pipeline_debug.log
+training_*.log
+
+# Additional ignores
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Test coverage
+.coverage
+.tox/
+.pytest_cache/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Project specific
+experiments/
+sr/
+project_tree.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Virtual environment
+venv/
+.env/
+
+# Data and models (not tracked)
+data/
+models/
+results/
+
+# Generated documentation
+docs/_build/
+
+# Final delivery (handled separately)
+FINAL_DELIVERY/
+
+# Experimental files
+scripts/full_pipeline.py
+src/evaluation/production_validation.py
+
+# Final delivery artifacts
+FINAL_PROJECT_HEALTH_CHECK.md
+**/FINAL_DELIVERY/
+

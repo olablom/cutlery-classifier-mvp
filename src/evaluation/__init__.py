@@ -1,7 +1,5 @@
-# Evaluation package for cutlery classifier
+"""Evaluation package for cutlery classifier."""
 
-from .evaluator import CutleryEvaluator
+from .production_validation import ProductionValidator
 
-__all__ = [
-    "CutleryEvaluator",
-]
+__all__ = ["ProductionValidator"]

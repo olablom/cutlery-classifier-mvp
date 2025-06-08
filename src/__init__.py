@@ -1,20 +1,27 @@
 """
-Cutlery Classifier MVP
+Cutlery Classifier Package
 
-A hierarchical AI classification system for cutlery identification by type and manufacturer.
-Optimized for commercial kitchen automation and embedded deployment.
+A production-grade image classification system for airport security.
 """
 
-__version__ = "1.0.0"
-__author__ = "Ola Blom"
-__email__ = "ola.blom@example.com"
-
-# Core modules
-from . import data
+from . import evaluation
 from . import models
 from . import training
-from . import evaluation
-from . import inference
 from . import utils
+from . import data
+from . import pipeline
+from . import inference
+from . import augment
 
-__all__ = ["data", "models", "training", "evaluation", "inference", "utils"]
+__version__ = "0.1.0"
+
+__all__ = [
+    "evaluation",
+    "models",
+    "training",
+    "utils",
+    "data",
+    "pipeline",
+    "inference",
+    "augment",
+]

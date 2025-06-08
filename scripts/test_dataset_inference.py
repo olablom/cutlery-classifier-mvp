@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
+from torchvision import transforms, models
 from torchvision.datasets import ImageFolder
 from PIL import Image
 import numpy as np
@@ -26,9 +26,6 @@ import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-
-from src.models.factory import create_model
-
 
 # Configure logging
 logging.basicConfig(
@@ -47,10 +44,6 @@ def load_model(model_path: str, device: torch.device) -> nn.Module:
 
     Returns:
         Tuple of (loaded model, class names)
-
-    The function handles two checkpoint formats:
-    1. Dictionary with "model_state_dict" key (from trainer)
-    2. Raw state_dict (from hyperparameter tuning)
     """
     model_path = Path(model_path)
     abs_model_path = model_path.resolve()
@@ -60,7 +53,7 @@ def load_model(model_path: str, device: torch.device) -> nn.Module:
         raise FileNotFoundError(f"Model not found at {model_path}")
 
     # Try to load class names from training data directory
-    data_dirs = [Path("data/processed/train"), Path("data/augmented")]
+    data_dirs = [Path("data/simplified/train"), Path("data/augmented/train")]
 
     class_names = None
     for data_dir in data_dirs:
@@ -71,19 +64,17 @@ def load_model(model_path: str, device: torch.device) -> nn.Module:
 
     if not class_names:
         raise RuntimeError(
-            "Could not find class names in data/processed/train or data/augmented"
+            "Could not find class names in data/simplified/train or data/augmented/train"
         )
 
     num_classes = len(class_names)
     logger.info(f"Found {num_classes} classes: {', '.join(class_names)}")
 
-    # Create model using factory with same config as training
-    model = create_model(
-        model_config="resnet18",
-        num_classes=num_classes,
-        pretrained=True,
-        grayscale=True,
-        freeze_backbone=False,
+    # Create model with same architecture as training
+    model = models.resnet18(pretrained=True)
+    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    model.fc = nn.Sequential(
+        nn.Dropout(p=0.5), nn.Linear(model.fc.in_features, num_classes)
     )
 
     # Load trained weights from checkpoint
@@ -206,7 +197,9 @@ def evaluate_model(
     class_names: List[str],
     device: torch.device,
     save_misclassified: bool = False,
-) -> Tuple[Dict[str, int], Dict[str, int], List[Tuple[str, str, str]]]:
+    confidence_analysis: bool = False,
+    stress_test: bool = False,
+) -> Tuple[Dict[str, int], Dict[str, int], List[Tuple[str, str, str]], Optional[Dict]]:
     """
     Evaluate model on test dataset.
 
@@ -216,21 +209,27 @@ def evaluate_model(
         class_names: list of class names
         device: torch device
         save_misclassified: whether to save Grad-CAM for misclassified images
+        confidence_analysis: whether to perform confidence analysis
+        stress_test: whether to perform stress tests
 
     Returns:
-        correct counts per class, total counts per class, and misclassified examples
+        correct counts per class, total counts per class, misclassified examples, and analysis results
     """
     correct_per_class = defaultdict(int)
     total_per_class = defaultdict(int)
     misclassified = []
+    confidences = []
+    analysis_results = {}
 
     with torch.no_grad():
         for images, targets in data_loader:
             images = images.to(device)
             targets = targets.to(device)
 
+            # Run inference
             outputs = model(images)
-            _, predicted = torch.max(outputs, 1)
+            probabilities = F.softmax(outputs, dim=1)
+            confidence, predicted = torch.max(probabilities, 1)
 
             # Get image path and true/predicted classes
             image_path = data_loader.dataset.samples[len(misclassified)][0]
@@ -238,6 +237,7 @@ def evaluate_model(
             pred_class = class_names[predicted.item()]
 
             total_per_class[true_class] += 1
+            confidences.append(confidence.item())
 
             if predicted == targets:
                 correct_per_class[true_class] += 1
@@ -248,20 +248,128 @@ def evaluate_model(
                         model, image_path, true_class, pred_class, class_names, device
                     )
 
-    return correct_per_class, total_per_class, misclassified
+    if confidence_analysis:
+        analysis_results["confidence"] = {
+            "mean": np.mean(confidences),
+            "min": np.min(confidences),
+            "max": np.max(confidences),
+            "std": np.std(confidences),
+        }
+
+        # Plot confidence distribution
+        plt.figure(figsize=(10, 6))
+        plt.hist(confidences, bins=20)
+        plt.title("Model Confidence Distribution")
+        plt.xlabel("Confidence")
+        plt.ylabel("Count")
+        plt.savefig("results/confidence_distribution.png")
+        plt.close()
+
+    if stress_test:
+        # Perform stress tests with various perturbations
+        noise_results = stress_test_noise(model, data_loader, device)
+        blur_results = stress_test_blur(model, data_loader, device)
+        rotation_results = stress_test_rotation(model, data_loader, device)
+
+        analysis_results["stress_test"] = {
+            "noise": noise_results,
+            "blur": blur_results,
+            "rotation": rotation_results,
+        }
+
+    return correct_per_class, total_per_class, misclassified, analysis_results
+
+
+def stress_test_noise(
+    model: nn.Module, data_loader: DataLoader, device: torch.device
+) -> float:
+    """Run stress test with Gaussian noise."""
+    correct = 0
+    total = 0
+    noise_level = 0.1
+
+    with torch.no_grad():
+        for images, targets in data_loader:
+            images = images.to(device)
+            targets = targets.to(device)
+
+            # Add Gaussian noise
+            noise = torch.randn_like(images) * noise_level
+            noisy_images = images + noise
+            noisy_images = torch.clamp(noisy_images, 0, 1)
+
+            outputs = model(noisy_images)
+            _, predicted = torch.max(outputs, 1)
+
+            correct += (predicted == targets).sum().item()
+            total += targets.size(0)
+
+    return correct / total
+
+
+def stress_test_blur(
+    model: nn.Module, data_loader: DataLoader, device: torch.device
+) -> float:
+    """Run stress test with Gaussian blur."""
+    correct = 0
+    total = 0
+    kernel_size = 5
+    sigma = 2.0
+
+    blur = transforms.GaussianBlur(kernel_size, sigma)
+
+    with torch.no_grad():
+        for images, targets in data_loader:
+            images = images.to(device)
+            targets = targets.to(device)
+
+            # Apply blur
+            blurred_images = blur(images)
+
+            outputs = model(blurred_images)
+            _, predicted = torch.max(outputs, 1)
+
+            correct += (predicted == targets).sum().item()
+            total += targets.size(0)
+
+    return correct / total
+
+
+def stress_test_rotation(
+    model: nn.Module, data_loader: DataLoader, device: torch.device
+) -> float:
+    """Run stress test with random rotations."""
+    correct = 0
+    total = 0
+    max_angle = 30
+
+    with torch.no_grad():
+        for images, targets in data_loader:
+            images = images.to(device)
+            targets = targets.to(device)
+
+            # Apply random rotation
+            angle = torch.randint(-max_angle, max_angle + 1, (1,)).item()
+            rotated_images = transforms.functional.rotate(images, angle)
+
+            outputs = model(rotated_images)
+            _, predicted = torch.max(outputs, 1)
+
+            correct += (predicted == targets).sum().item()
+            total += targets.size(0)
+
+    return correct / total
 
 
 def main():
-    """Main test function."""
-    parser = argparse.ArgumentParser(
-        description="Evaluate cutlery classifier on test dataset"
-    )
+    """Main entry point."""
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--device",
         type=str,
         choices=["cuda", "cpu"],
         required=True,
-        help="Device to run inference on",
+        help="Device to run on",
     )
     parser.add_argument(
         "--test_dir", type=str, required=True, help="Path to test dataset directory"
@@ -270,72 +378,70 @@ def main():
         "--model",
         type=str,
         default="models/checkpoints/type_detector_best.pth",
-        help="Path to trained model (.pth). Defaults to models/checkpoints/type_detector_best.pth",
+        help="Path to model checkpoint",
     )
     parser.add_argument(
         "--save-misclassified",
         action="store_true",
-        help="Generate Grad-CAM visualizations for misclassified images",
+        help="Save Grad-CAM visualizations for misclassified images",
+    )
+    parser.add_argument(
+        "--confidence-analysis", action="store_true", help="Perform confidence analysis"
+    )
+    parser.add_argument(
+        "--stress-test", action="store_true", help="Perform stress tests"
     )
 
     args = parser.parse_args()
+    device = torch.device(args.device)
 
-    # Set up device
-    if args.device == "cuda" and not torch.cuda.is_available():
-        logger.warning("CUDA requested but not available. Using CPU instead.")
-        device = torch.device("cpu")
-    else:
-        device = torch.device(args.device)
+    # Load model and data
+    model, class_names = load_model(args.model, device)
+    data_loader, dataset_classes = create_data_loader(args.test_dir)
 
-    logger.info(f"Using device: {device}")
+    # Evaluate model
+    correct_per_class, total_per_class, misclassified, analysis_results = (
+        evaluate_model(
+            model,
+            data_loader,
+            class_names,
+            device,
+            args.save_misclassified,
+            args.confidence_analysis,
+            args.stress_test,
+        )
+    )
 
-    try:
-        # Load model and create data loader
-        model, class_names = load_model(args.model, device)
-        data_loader, class_names = create_data_loader(args.test_dir)
-
-        logger.info(f"Running inference on {len(data_loader)} test images...")
-
-        # Evaluate model
-        correct_per_class, total_per_class, misclassified = evaluate_model(
-            model, data_loader, class_names, device, args.save_misclassified
+    # Print results
+    logger.info("\nPer-class Results:")
+    for class_name in class_names:
+        accuracy = (correct_per_class[class_name] / total_per_class[class_name]) * 100
+        logger.info(
+            f"{class_name}: {accuracy:.2f}% ({correct_per_class[class_name]}/{total_per_class[class_name]})"
         )
 
-        # Print results
-        print("\nResults:")
-        total_correct = 0
-        total_images = 0
+    total_correct = sum(correct_per_class.values())
+    total_samples = sum(total_per_class.values())
+    overall_accuracy = (total_correct / total_samples) * 100
+    logger.info(f"\nOverall Accuracy: {overall_accuracy:.2f}%")
 
-        for class_name in class_names:
-            correct = correct_per_class[class_name]
-            total = total_per_class[class_name]
-            accuracy = (correct / total * 100) if total > 0 else 0
-            print(f"Class '{class_name}': {correct}/{total} correct ({accuracy:.2f}%)")
-
-            total_correct += correct
-            total_images += total
-
-        overall_accuracy = total_correct / total_images * 100
-        print(
-            f"\nOverall accuracy: {overall_accuracy:.2f}% ({total_correct}/{total_images})"
+    if args.confidence_analysis and analysis_results.get("confidence"):
+        conf = analysis_results["confidence"]
+        logger.info("\nConfidence Analysis:")
+        logger.info(f"Mean confidence: {conf['mean']:.2f}")
+        logger.info(f"Min confidence: {conf['min']:.2f}")
+        logger.info(f"Max confidence: {conf['max']:.2f}")
+        logger.info(f"Std confidence: {conf['std']:.2f}")
+        logger.info(
+            "Confidence distribution plot saved to results/confidence_distribution.png"
         )
 
-        if misclassified:
-            print("\nMisclassified images:")
-            for image_path, true_label, pred_label in misclassified:
-                rel_path = Path(image_path).relative_to(args.test_dir)
-                print(f"{rel_path} → predicted as {pred_label}")
-
-            if args.save_misclassified:
-                print(
-                    "\nGrad-CAM saved for misclassified images in: results/misclassified_grad_cam/"
-                )
-        else:
-            print("\nNo misclassified images!")
-
-    except Exception as e:
-        logger.error(f"Error during testing: {str(e)}")
-        raise
+    if args.stress_test and analysis_results.get("stress_test"):
+        stress = analysis_results["stress_test"]
+        logger.info("\nStress Test Results:")
+        logger.info(f"Noise test accuracy: {stress['noise']:.2f}%")
+        logger.info(f"Blur test accuracy: {stress['blur']:.2f}%")
+        logger.info(f"Rotation test accuracy: {stress['rotation']:.2f}%")
 
 
 if __name__ == "__main__":
