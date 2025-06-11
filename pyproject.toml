@@ -4,23 +4,57 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cutlery-classifier"
-version = "0.1.0"
+version = "3.0.0"
 authors = [
     { name="Ola Blom", email="ola.blom@example.com" },
 ]
-description = "Production-grade cutlery classifier with explainability"
+description = "Production-grade cutlery classifier with RTX 5090 optimization (1.99ms inference)"
 readme = "README.md"
 requires-python = ">=3.8"
+keywords = ["machine learning", "computer vision", "cutlery", "classification", "rtx5090", "cuda", "pytorch"]
+license = { file = "LICENSE" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Science/Research",
+    "Intended Audience :: Science/Research", 
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "torch>=2.6.0",
+    "torchvision>=0.17.0", 
+    "pillow>=8.3.0",
+    "numpy>=1.21.0",
+    "matplotlib>=3.4.0",
+    "grad-cam>=1.4.0",
+    "onnx>=1.12.0",
+    "onnxruntime-gpu>=1.12.0",
+    "plotly>=5.0.0",
+    "kaleido>=0.2.1",
+    "optuna>=3.0.0",
+    "click>=8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=1.0.0",
+]
+rtx5090 = [
+    "torch>=2.8.0.dev20250610+cu128",
+    "torchvision>=0.20.0.dev20250610+cu128",
 ]
 
 [tool.setuptools.packages.find]
