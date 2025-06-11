@@ -1,31 +1,44 @@
-# Core ML
-torch==2.3.1
-torchvision==0.18.1
-numpy==1.26.4
-pillow==11.2.1
-scikit-learn==1.6.1
+# Core ML Framework - RTX 5090 Optimized
+torch>=2.8.0  # PyTorch nightly with sm_120 support
+torchvision>=0.23.0  # Compatible with PyTorch nightly
+torchaudio>=2.8.0  # Audio processing support
 
-# Computer Vision
-opencv-python==4.11.0.86
-grad-cam==1.5.5
+# Computer Vision & Image Processing
+opencv-python>=4.11.0.86
+pillow>=11.1.0
+grad-cam>=1.5.5  # Model explainability
 
-# Visualization
-matplotlib==3.10.3
-seaborn==0.13.2
+# Scientific Computing
+numpy>=2.2.2
+scikit-learn>=1.6.1
+scipy>=1.15.3
 
-# Model Export
-onnx==1.18.0
-onnxruntime==1.22.0
+# Hyperparameter Optimization
+optuna>=4.3.0  # Hyperparameter tuning framework
 
-# Training & Evaluation
-optuna==3.5.0
-tqdm==4.67.1
-pandas==2.2.3
+# Visualization & Plotting
+matplotlib>=3.10.0
+seaborn>=0.13.2
+plotly>=5.0.0  # For interactive plots
+kaleido>=0.2.1  # Static image export for plotly
+
+# Data Handling
+pandas>=2.2.3
+tqdm>=4.67.1  # Progress bars
+
+# Model Export & Deployment
+onnx>=1.18.0
+onnxruntime>=1.22.0
 
 # Utilities
-PyYAML==6.0.2
-coloredlogs==15.0.1
+PyYAML>=6.0.2
+coloredlogs>=15.0.1  # Enhanced logging
+pathlib2>=2.3.0  # Path handling
 
 # Testing
-pytest==8.4.0
-pytest-cov==6.1.1
+pytest>=8.4.0
+pytest-cov>=6.1.1
+
+# Development Tools
+jupyter>=1.0.0  # For notebooks
+ipykernel>=6.0.0  # Jupyter kernel support 

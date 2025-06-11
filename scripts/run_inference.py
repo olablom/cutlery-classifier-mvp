@@ -74,8 +74,9 @@ def load_model(model_path: str, device: str) -> Tuple[nn.Module, List[str]]:
         f"Model created: {total_params:,} total params, {trainable_params:,} trainable"
     )
 
-    # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    # Load checkpoint with proper device mapping
+    # Always load to CPU first, then move to target device to avoid CUDA issues
+    checkpoint = torch.load(checkpoint_path, map_location="cpu")
     if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
         state_dict = checkpoint["model_state_dict"]
     else:
@@ -194,9 +195,9 @@ def main():
     parser.add_argument(
         "--device",
         type=str,
-        choices=["cuda", "cpu"],
-        required=True,
-        help="Device to run inference on",
+        choices=["cuda", "cpu", "auto"],
+        default="auto",
+        help="Device to run inference on (auto=automatically detect)",
     )
     parser.add_argument("--image", type=str, required=True, help="Path to input image")
     parser.add_argument(
@@ -212,8 +213,22 @@ def main():
     args = parser.parse_args()
 
     try:
-        # Setup device
-        device = torch.device(args.device)
+        # Setup device with automatic detection
+        if args.device == "auto":
+            if torch.cuda.is_available():
+                device = torch.device("cuda")
+                logger.info("CUDA detected, using GPU acceleration")
+            else:
+                device = torch.device("cpu")
+                logger.info("CUDA not available, falling back to CPU")
+        else:
+            # Manual device selection with validation
+            if args.device == "cuda" and not torch.cuda.is_available():
+                logger.warning("CUDA requested but not available, falling back to CPU")
+                device = torch.device("cpu")
+            else:
+                device = torch.device(args.device)
+
         logger.info(f"Using device: {device}")
 
         # Load model
