@@ -12,7 +12,6 @@ Usage:
 """
 
 import os
-import sys
 import json
 import argparse
 import logging
@@ -28,12 +27,8 @@ from torchvision.datasets import ImageFolder
 import yaml
 from sklearn.metrics import confusion_matrix, classification_report
 
-# Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
-
-from src.training.trainer import CutleryTrainer
-from src.models.factory import create_model
+from cutlery_classifier.training.trainer import CutleryTrainer
+from cutlery_classifier.models.factory import create_model
 
 # Configure logging
 logging.basicConfig(

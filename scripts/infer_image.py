@@ -21,7 +21,6 @@ Usage:
 
 import argparse
 import logging
-import sys
 import json
 from pathlib import Path
 from typing import List
@@ -31,13 +30,9 @@ import torch
 from PIL import Image
 import torchvision.transforms as transforms
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
-
-from src.inference.inferencer import CutleryInferencer
-from src.models.model_factory import create_model
-from src.utils.config import load_config
+from cutlery_classifier.inference.inferencer import CutleryInferencer
+from cutlery_classifier.models.model_factory import create_model
+from cutlery_classifier.utils.config import load_config
 
 # Setup logging
 log_dir = Path("results/logs")
@@ -73,7 +68,7 @@ def load_model(model_path):
         return model
     except Exception as e:
         logging.error(f"Error loading model: {str(e)}")
-        sys.exit(1)
+        exit(1)
 
 
 def predict_image(model, image_path, transform):

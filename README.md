@@ -219,11 +219,7 @@ Our technical choices are optimized for industrial deployment, with a focus on c
 
 ### Best Model Selection
 
-<<<<<<< HEAD
 The production model (`models/checkpoints/type_detector_best.pth`) was selected based on:
-=======
-The production model (`models/type_detector_best_model.pth`) was selected based on:
->>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
 
 - Lowest validation loss
 - 100% accuracy on validation set
@@ -245,36 +241,36 @@ source venv/bin/activate  # Linux/Mac
 # or
 .\venv\Scripts\activate  # Windows
 
-# Install dependencies
-<<<<<<< HEAD
+# Install package in development mode (includes all dependencies)
 pip install -e .
-=======
-pip install -r requirements.txt
->>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
 ```
 
 ### Inference
 
+**Option 1: Using original scripts (works after pip install -e .)**
+
 ```bash
-<<<<<<< HEAD
-# Important: Set PYTHONPATH for src layout
-PYTHONPATH=. python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth
-
-# Full test dataset evaluation
-PYTHONPATH=. python scripts/test_dataset_inference.py --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_best.pth
-
-# Generate GradCAM visualization
-PYTHONPATH=. python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth --grad-cam
-=======
 # Single image inference
-python scripts/run_inference.py --image path/to/image.jpg
+python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth
 
 # Full test dataset evaluation
-python scripts/test_dataset_inference.py --test_dir data/processed/test --save-misclassified
+python scripts/test_dataset_inference.py --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_best.pth
 
 # Generate GradCAM visualization
-python scripts/run_inference.py --image path/to/image.jpg --gradcam
->>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
+python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth --grad-cam
+```
+
+**Option 2: Using console commands (after pip install -e .)**
+
+```bash
+# Single image inference
+cutlery-inference --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth
+
+# Full test dataset evaluation
+cutlery-test --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_best.pth
+
+# Training
+cutlery-train --device cpu --epochs 20 --batch-size 16
 ```
 
 ## Limitations & Future Work
@@ -300,7 +296,6 @@ python scripts/run_inference.py --image path/to/image.jpg --gradcam
 cutlery-classifier-mvp/
 ├── config/           # Configuration files
 ├── data/            # Dataset directory
-<<<<<<< HEAD
 │   └── simplified/  # Processed dataset
 ├── demo_images/     # Example images and GradCAM visualizations
 ├── models/          # Trained model checkpoints
@@ -308,13 +303,6 @@ cutlery-classifier-mvp/
 ├── scripts/         # Production scripts
 ├── src/            # Source code
 │   └── cutlery_classifier/ # Main package
-=======
-├── demo_images/     # Example images and GradCAM visualizations
-├── models/          # Trained model checkpoints
-├── results/         # Evaluation results and plots
-├── scripts/         # Inference and evaluation scripts
-├── src/            # Source code
->>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
 └── tests/          # Test suite
 ```
 

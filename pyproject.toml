@@ -6,17 +6,29 @@ build-backend = "setuptools.build_meta"
 name = "cutlery-classifier"
 version = "0.1.0"
 authors = [
-    { name="Claude", email="claude@anthropic.com" },
+    { name="Ola Blom", email="ola.blom@example.com" },
 ]
-description = "Production-grade cutlery classifier with airport security features"
+description = "Production-grade cutlery classifier with explainability"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["*"]
-namespaces = false 
+namespaces = false
+
+[project.scripts]
+cutlery-inference = "cutlery_classifier.scripts.run_inference:main"
+cutlery-test = "cutlery_classifier.scripts.test_dataset_inference:main"
+cutlery-train = "cutlery_classifier.scripts.train_type_detector:main" 

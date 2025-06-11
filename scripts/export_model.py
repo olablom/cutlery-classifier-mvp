@@ -23,17 +23,12 @@ Usage:
 
 import argparse
 import logging
-import sys
 import torch
 import torch.onnx
 from pathlib import Path
 import time
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
-
-from src.models.factory import create_model
+from cutlery_classifier.models.factory import create_model
 
 
 def export_to_onnx(
@@ -276,7 +271,7 @@ def main():
     if args.output:
         output_dir = Path(args.output)
     else:
-        output_dir = project_root / "models" / "exports"
+        output_dir = Path("models") / "exports"
 
     output_dir.mkdir(parents=True, exist_ok=True)
 

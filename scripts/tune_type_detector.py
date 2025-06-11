@@ -11,7 +11,6 @@ using Optuna. It tunes the following parameters:
 """
 
 import os
-import sys
 import json
 import logging
 import argparse
@@ -29,12 +28,8 @@ from optuna.visualization import (
     plot_parallel_coordinate,
 )
 
-# Add src to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
-
-from src.training.trainer import CutleryTrainer
-from src.models.factory import create_model
+from cutlery_classifier.training.trainer import CutleryTrainer
+from cutlery_classifier.models.factory import create_model
 
 # Configure logging
 logging.basicConfig(
@@ -45,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 def load_base_config() -> Dict[str, Any]:
     """Load base configuration from config file."""
-    config_path = project_root / "config" / "train_config.yaml"
+    config_path = Path("config/train_config.yaml")
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
@@ -123,14 +118,12 @@ def save_best_model(study: optuna.Study, base_config: Dict[str, Any]) -> None:
     trainer.train(train_loader, val_loader)
 
     # Save best model
-    best_model_path = (
-        project_root / "models" / "checkpoints" / "type_detector_best_tuned.pth"
-    )
+    best_model_path = Path("models/checkpoints/type_detector_best_tuned.pth")
     torch.save(trainer.model.state_dict(), best_model_path)
     logger.info(f"Best tuned model saved to: {best_model_path}")
 
     # Save best configuration
-    best_config_path = project_root / "results" / "best_tuning_config.json"
+    best_config_path = Path("results/best_tuning_config.json")
     with open(best_config_path, "w") as f:
         json.dump(best_config, f, indent=2)
     logger.info(f"Best configuration saved to: {best_config_path}")
@@ -138,7 +131,7 @@ def save_best_model(study: optuna.Study, base_config: Dict[str, Any]) -> None:
 
 def save_optuna_plots(study: optuna.Study) -> None:
     """Save Optuna visualization plots."""
-    plots_dir = project_root / "results" / "optuna_plots"
+    plots_dir = Path("results/optuna_plots")
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     # Plot optimization history
@@ -179,7 +172,7 @@ def main():
     base_config = load_base_config()
 
     # Create study
-    db_path = project_root / "results" / "optuna_study.db"
+    db_path = Path("results/optuna_study.db")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     study = optuna.create_study(
         study_name="cutlery_classifier_optimization",

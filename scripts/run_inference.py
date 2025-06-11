@@ -203,7 +203,7 @@ def main():
         "--model",
         type=str,
         default="models/checkpoints/type_detector_best.pth",
-        help="Path to trained model (.pth). Defaults to models/checkpoints/type_detector_best.pth",
+        help="Path to model checkpoint",
     )
     parser.add_argument(
         "--grad-cam", action="store_true", help="Generate Grad-CAM visualization"
@@ -211,32 +211,29 @@ def main():
 
     args = parser.parse_args()
 
-    # Set up device
-    if args.device == "cuda" and not torch.cuda.is_available():
-        logger.warning("CUDA requested but not available. Using CPU instead.")
-        device = torch.device("cpu")
-    else:
-        device = torch.device(args.device)
-
-    logger.info(f"Using device: {device}")
-
     try:
-        # Load model and preprocess image
+        # Setup device
+        device = torch.device(args.device)
+        logger.info(f"Using device: {device}")
+
+        # Load model
         model, class_names = load_model(args.model, device)
+
+        # Preprocess image
         image_tensor = preprocess_image(args.image)
 
         # Get predictions
         predictions = get_predictions(model, image_tensor, class_names, device)
-        predicted_class = max(predictions.items(), key=lambda x: x[1])[0]
 
-        # Log results
+        # Find predicted class
+        predicted_class = max(predictions, key=predictions.get)
+
+        # Print results
         logger.info("\nPrediction Results:")
         logger.info(f"Predicted class: {predicted_class}")
         logger.info("Class probabilities:")
-        for class_name, probability in sorted(
-            predictions.items(), key=lambda x: x[1], reverse=True
-        ):
-            logger.info(f"{class_name}: {probability:.4f}")
+        for class_name, prob in predictions.items():
+            logger.info(f"{class_name}: {prob:.4f}")
 
         # Generate Grad-CAM if requested
         if args.grad_cam:

@@ -26,11 +26,7 @@ from torchvision.transforms import functional as TF
 from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
 
-# Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
-
-from src.augment.generate_diffusion_images import main as diffusion_main
+from cutlery_classifier.augment.generate_diffusion_images import main as diffusion_main
 
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
