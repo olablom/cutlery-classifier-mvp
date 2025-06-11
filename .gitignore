@@ -1,9 +1,11 @@
-# Python
+# Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -19,26 +21,39 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual Environment
 venv/
-ENV/
+.env
+.venv
 env/
+ENV/
+env.bak/
+venv.bak/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+.spyderproject
+.spyproject
+.ropeproject
 
-# Project specific
-*.pth
-models/checkpoints/
-results/
-data/
-presentation/assets/
-logs/
-*.log
+# Testing and coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+cover/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -49,44 +64,50 @@ logs/
 Thumbs.db
 desktop.ini
 
-# Local development
-.env
-.env.local
-*.local
-command_output.log
+# Project specific - Models and Data
+models/checkpoints/*
+!models/checkpoints/type_detector_best.pth
+models/exports/
+*.pt
+*.pth
+!models/checkpoints/type_detector_best.pth
+*.onnx
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Project specific - Data
+data/*
+!data/simplified/
+!data/collection_checklist.md
+!data/PHOTO_COLLECTION_GUIDE.md
+!data/PHOTO_COLLECTION_GUIDE_FINAL.md
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# Project specific - Results and Logs
+results/*
+!results/plots/
+logs/
+wandb/
+mlruns/
+.tensorboard/
+*.log
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Project specific - Documentation
+docs/*
+!docs/test_report_template.md
+!docs/fotograferingsguide.md
 
-# Unit test / coverage reports
+# Project specific - Demo Images
+demo_images/*
+!demo_images/grad_cam/
+
+# Results and temporary files
+results/*
+!results/plots/
+logs/
+wandb/
+mlruns/
+.tensorboard/
+*.log
+
+# Testing and coverage
 htmlcov/
 .tox/
 .nox/
@@ -96,177 +117,41 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
-*.py,cover
 .hypothesis/
 .pytest_cache/
 cover/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# PyBuilder
-.pybuilder/
-target/
-
 # Jupyter Notebook
 .ipynb_checkpoints
-notebooks/
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be added to the global gitignore or merged into this project gitignore.  For a PyCharm
-#  project, it is recommended to exclude the entire .idea directory.
-#  https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-.idea/
-
-# Project specific data
-data/raw/
-data/processed/
-data/augmented/
-demo_images/
-
-# Internal documentation and guides
-docs/fotograferingsguide.md
-
-# Model files and checkpoints
-models/checkpoints/*
-!models/checkpoints/type_detector_best.pth
-models/exports/
-*.pt
-*.pth
-*.onnx
-
-# Results and logs
-results/run_*/
-!results/run_latest/
-results/optuna_study.db
-results/optuna_plots/
-logs/
-wandb/
-mlruns/
-.tensorboard/
-*.log
-
-# Temporary files
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Experiment tracking
-experiments/
-temp/
-
-# Environment variables and secrets
-.env
-*.key
-secrets.yaml
-config/secrets.yaml
-
-# IDE specific
-.vscode/
-.idea/
-*.swp
-*.swo
+*.ipynb
 
 # OS specific
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Keep specific documentation
+!docs/test_report_template.md
+!docs/fotograferingsguide.md
+
+# Distribution / packaging
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Keep original delivery files
+!FINAL_DELIVERY_V2/
+!README_FINAL_DELIVERY.md
+
+# Project specific
+*.pth
+models/checkpoints/
+results/
+data/
+presentation/assets/
+logs/
+*.log
 
 # Project specific ignores
 # Datasets
@@ -344,12 +229,6 @@ build/
 experiments/
 sr/
 project_tree.txt
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
 
 # Logs and temporary files
 *.log
