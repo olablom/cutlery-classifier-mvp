@@ -323,4 +323,92 @@ ENV/
 # Large Dataset Files (if raw data gets too big)
 data/raw/*.jpg
 data/augmented/*.jpg
+!data/raw/sample_*.jpg  # Keep sample files for demo
+
+# Auto-added for cleanup
+*.db
+*.jpg
+outputs/
+models/checkpoints/
+__pycache__/
+*.pth
+*.pt
+.DS_Store
+
+# Final delivery (handled separately)
+FINAL_DELIVERY/
+
+# Experimental files
+scripts/full_pipeline.py
+src/evaluation/production_validation.py
+
+# Final delivery artifacts
+FINAL_PROJECT_HEALTH_CHECK.md
+**/FINAL_DELIVERY/
+
+# RTX 5090 Optimization - Generated Files
+# =====================================
+
+# Model Files & Exports
+*.pth
+*.pt
+*.onnx
+*.torchscript
+models/exports/
+models/checkpoints/*.pth
+!models/checkpoints/type_detector_best.pth  # Keep best model
+
+# Generated Results & Artifacts
+results/grad_cam/*.jpg
+results/optuna_plots/
+results/production_validation/*.txt
+results/logs/
+results/metrics/
+benchmark_rtx5090.py  # Temporary benchmark script
+
+# PyTorch & CUDA Generated
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.cache/
+
+# Optuna Database
+*.db
+optuna_study.db
+
+# Jupyter & Development
+.ipynb_checkpoints/
+*.ipynb
+
+# System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs & Temp Files
+*.log
+*.tmp
+*.temp
+.pytest_cache/
+.coverage
+
+# Virtual Environment (if not using global venv)
+venv/
+env/
+ENV/
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large Dataset Files (if raw data gets too big)
+data/raw/*.jpg
+data/augmented/*.jpg
 !data/raw/sample_*.jpg  # Keep sample files for demo 

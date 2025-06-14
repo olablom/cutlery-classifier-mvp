@@ -130,3 +130,54 @@ def save_metrics(metrics, save_path):
     # Log key metrics
     logging.info(f"Overall Accuracy: {metrics['overall']['accuracy']:.2f}%")
     logging.info(f"Weighted F1-Score: {metrics['overall']['weighted_f1']:.2f}%")
+
+
+def plot_confusion_matrix_vg(y_true, y_pred, class_names, save_path):
+    """
+    Plot and save a VG-grade confusion matrix with both counts and percentages in each cell.
+    Args:
+        y_true: Ground truth labels (list or np.array)
+        y_pred: Predicted labels (list or np.array)
+        class_names: List of class names (strings)
+        save_path: Path to save the confusion matrix plot (PNG)
+    """
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(class_names)))
+    cm_sum = cm.sum(axis=1, keepdims=True)
+    # Avoid division by zero
+    with np.errstate(all="ignore"):
+        cm_perc = np.divide(cm, cm_sum, where=cm_sum != 0) * 100
+        cm_perc = np.nan_to_num(cm_perc)
+
+    n_classes = len(class_names)
+    annot = np.empty_like(cm).astype(str)
+    for i in range(n_classes):
+        for j in range(n_classes):
+            count = cm[i, j]
+            perc = cm_perc[i, j]
+            if cm_sum[i, 0] == 0:
+                annot[i, j] = f"0 (0%)"
+            else:
+                annot[i, j] = f"{count} ({perc:.0f}%)"
+
+    plt.figure(figsize=(15, 12))
+    ax = sns.heatmap(
+        cm,
+        annot=annot,
+        fmt="",
+        cmap="Blues",
+        xticklabels=class_names,
+        yticklabels=class_names,
+        cbar=True,
+        linewidths=0.5,
+        linecolor="gray",
+        square=True,
+    )
+    ax.set_xlabel("Predicted Label", fontsize=16)
+    ax.set_ylabel("True Label", fontsize=16)
+    ax.set_title("Confusion Matrix (Counts and % per class)", fontsize=18, pad=20)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+    plt.close()

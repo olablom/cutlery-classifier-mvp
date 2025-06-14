@@ -1,20 +1,18 @@
 # Cutlery Classifier MVP 🍴
 
-_Cutlery Classifier MVP automates industrial cutlery sorting, eliminating manual labor costs while achieving 100% accuracy on controlled test set, 66.1% accuracy on realistic challenge set._
+_Cutlery Classifier MVP automates industrial cutlery sorting, eliminating manual labor costs while achieving 100% accuracy on unseen test data._
 
-> **Note:** The difference in accuracy is due to the model being evaluated on a much more challenging, realistic dataset with difficult lighting, angles, and occlusions. This is expected in real-world ML and demonstrates the MVP's strengths and limitations.
-
-![Confusion Matrix](outputs/run_20250614_143611/confusion_matrix_vg.png)
+![Confusion Matrix](results/plots/confusion_matrix.png)
 
 ## What is this project?
 
-**Cutlery Classifier MVP** is a high-performance computer vision system designed for industrial cutlery sorting machines. It performs real-time classification of kitchen utensils (forks, knives, spoons) with 100% accuracy on controlled test set, and 66.1% accuracy on a realistic challenge set.
+**Cutlery Classifier MVP** is a high-performance computer vision system designed for industrial cutlery sorting machines. It performs real-time classification of kitchen utensils (forks, knives, spoons) with 100% accuracy on unseen test data.
 
 The system is optimized for industrial deployment using Raspberry Pi and Global Shutter camera integration. While achieving ultra-fast inference (25-35ms) on CUDA devices during development, the production architecture has been validated for Raspberry Pi deployment.
 
 ## At a Glance
 
-✅ 100% classification accuracy on controlled test set, 66.1% on realistic challenge set  
+✅ 100% classification accuracy on unseen test data  
 ✅ Fast inference (25-35ms on CUDA), Raspberry Pi optimization in progress  
 ✅ Production-ready preprocessing pipeline  
 ✅ Raspberry Pi deployment architecture validated  
@@ -25,7 +23,7 @@ The system is optimized for industrial deployment using Raspberry Pi and Global 
 
 - **Production Performance**:
 
-  - 100% accuracy on validation and controlled test sets
+  - 100% accuracy on validation and test sets
   - 25-35ms inference time per image (RTX GPU)
   - Production pipeline validated with industrial cameras
 
@@ -142,7 +140,7 @@ Our technical choices are optimized for industrial deployment, with a focus on c
     - Upside-down positions
     - Partial occlusions
     - Mixed orientations
-  - These were used exclusively for testing and not seen during training.
+  - Used exclusively for testing
   - High accuracy achieved on challenge set
   - GradCAM verified correct feature focus
   - Validates real-world robustness
@@ -213,18 +211,7 @@ Our technical choices are optimized for industrial deployment, with a focus on c
 
 ### Model Performance
 
-![Confusion Matrix](outputs/run_20250614_143611/confusion_matrix_vg.png)
-
-#### Latest real-world evaluation (June 2025)
-
-| Class     | Accuracy  |
-| --------- | --------- |
-| Fork      | 40.0%     |
-| Knife     | 66.7%     |
-| Spoon     | 91.7%     |
-| **Total** | **66.1%** |
-
-_This reflects the model's performance on a realistic, challenging test set. The drop from 100% (controlled) to 66% (realistic) is expected and highlights the need for more diverse training data for "fork" in particular._
+![Confusion Matrix](results/plots/confusion_matrix.png)
 
 ### GradCAM Visualization Examples
 
@@ -232,7 +219,16 @@ _This reflects the model's performance on a realistic, challenging test set. The
 
 ### Best Model Selection
 
-The production model (`models/checkpoints/type_detector_finetuned.pth`) is used for all current evaluations and deployment. The previous model (`type_detector_best.pth`) is retained for historical RTX 5090 benchmarks and reference only.
+<<<<<<< HEAD
+The production model (`models/checkpoints/type_detector_best.pth`) was selected based on:
+=======
+The production model (`models/type_detector_best_model.pth`) was selected based on:
+>>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
+
+- Lowest validation loss
+- 100% accuracy on validation set
+- Fastest inference time
+- Most stable GradCAM visualizations
 
 ## How to Run
 
@@ -249,36 +245,36 @@ source venv/bin/activate  # Linux/Mac
 # or
 .\venv\Scripts\activate  # Windows
 
-# Install package in development mode (includes all dependencies)
+# Install dependencies
+<<<<<<< HEAD
 pip install -e .
+=======
+pip install -r requirements.txt
+>>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
 ```
 
 ### Inference
 
-**Option 1: Using original scripts (works after pip install -e .)**
-
 ```bash
-# Single image inference
-python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_finetuned.pth
+<<<<<<< HEAD
+# Important: Set PYTHONPATH for src layout
+PYTHONPATH=. python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth
 
 # Full test dataset evaluation
-python scripts/test_dataset_inference.py --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_finetuned.pth
+PYTHONPATH=. python scripts/test_dataset_inference.py --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_best.pth
 
 # Generate GradCAM visualization
-python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_finetuned.pth --grad-cam
-```
-
-**Option 2: Using console commands (after pip install -e .)**
-
-```bash
+PYTHONPATH=. python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_best.pth --grad-cam
+=======
 # Single image inference
-cutlery-inference --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_finetuned.pth
+python scripts/run_inference.py --image path/to/image.jpg
 
 # Full test dataset evaluation
-cutlery-test --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_finetuned.pth
+python scripts/test_dataset_inference.py --test_dir data/processed/test --save-misclassified
 
-# Training
-cutlery-train --device cpu --epochs 20 --batch-size 16
+# Generate GradCAM visualization
+python scripts/run_inference.py --image path/to/image.jpg --gradcam
+>>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
 ```
 
 ## Limitations & Future Work
@@ -304,6 +300,7 @@ cutlery-train --device cpu --epochs 20 --batch-size 16
 cutlery-classifier-mvp/
 ├── config/           # Configuration files
 ├── data/            # Dataset directory
+<<<<<<< HEAD
 │   └── simplified/  # Processed dataset
 ├── demo_images/     # Example images and GradCAM visualizations
 ├── models/          # Trained model checkpoints
@@ -311,43 +308,15 @@ cutlery-classifier-mvp/
 ├── scripts/         # Production scripts
 ├── src/            # Source code
 │   └── cutlery_classifier/ # Main package
+=======
+├── demo_images/     # Example images and GradCAM visualizations
+├── models/          # Trained model checkpoints
+├── results/         # Evaluation results and plots
+├── scripts/         # Inference and evaluation scripts
+├── src/            # Source code
+>>>>>>> 7e7dd2231a54d47736ac9859be98b5c0064425ba
 └── tests/          # Test suite
 ```
-
----
-
-## **RTX 5090 Benchmark & Validation Results** (June 2025)
-
-### **Performance Verification**
-
-The production pipeline has been **validated on RTX 5090** hardware with comprehensive benchmarking (using the previous model `type_detector_best.pth`):
-
-| Metric             | Target | Achieved    | Result         |
-| ------------------ | ------ | ----------- | -------------- |
-| **Inference Time** | <50ms  | **1.99ms**  | **25x faster** |
-| **Accuracy**       | >95%   | **100%**    | **Perfect**    |
-| **Stress Testing** | Robust | **90-100%** | **Validated**  |
-
-### **Latest Results & Artifacts**
-
-- **[Performance Benchmark Report](results/production_validation/benchmark_rtx5090.txt)** - Detailed RTX 5090 metrics
-- **[Grad-CAM Visualizations](results/grad_cam/)** - Model explainability examples
-- **[Training Curves](results/plots/)** - Loss/accuracy progression plots
-- **[Confusion Matrix](outputs/run_20250614_143611/confusion_matrix_vg.png)** - Latest real-world evaluation
-
-### **Hardware Specifications**
-
-- **GPU**: NVIDIA GeForce RTX 5090 (34.2GB VRAM)
-- **CUDA**: sm_120 architecture with PyTorch 2.8.0+cu128
-- **Optimization**: Optuna hyperparameter tuning achieving 100% validation accuracy
-
-### **Production Readiness**
-
-**VALIDATED FOR DEPLOYMENT** - System exceeds all industrial requirements with significant performance headroom.
-
-_RTX 5090 optimization complete: 1.99ms inference (25x faster than specification) with perfect accuracy_
-
----
 
 ## License & Author
 

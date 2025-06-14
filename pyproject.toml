@@ -52,10 +52,9 @@ dev = [
     "flake8>=5.0.0",
     "mypy>=1.0.0",
 ]
-rtx5090 = [
-    "torch>=2.8.0.dev20250610+cu128",
-    "torchvision>=0.20.0.dev20250610+cu128",
-]
+# rtx5090 = [
+#   "torch>=2.8.0.dev20250610+cu128"
+# ]
 
 [tool.setuptools.packages.find]
 where = ["src"]

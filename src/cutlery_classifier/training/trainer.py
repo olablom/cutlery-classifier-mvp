@@ -527,7 +527,13 @@ class CutleryTrainer:
         self.val_losses = checkpoint["val_losses"]
         self.train_accs = checkpoint["train_accs"]
         self.val_accs = checkpoint["val_accs"]
-        self.classes = checkpoint["classes"]
+        # Fallback för classes
+        if "classes" in checkpoint:
+            self.classes = checkpoint["classes"]
+        else:
+            logger.warning(
+                "Checkpoint saknar 'classes', använder self.classes från config."
+            )
 
         logger.info(f"Checkpoint loaded from {checkpoint_path}")
 

@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+import shutil
+from cutlery_classifier.evaluation.metrics import plot_confusion_matrix_vg
 
 # Configure logging
 logging.basicConfig(
@@ -361,6 +363,13 @@ def stress_test_rotation(
     return correct / total
 
 
+def create_output_folder(base_dir="outputs"):
+    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path(base_dir) / f"run_{now}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser()
@@ -395,6 +404,10 @@ def main():
     args = parser.parse_args()
     device = torch.device(args.device)
 
+    # Skapa unik output-folder
+    output_dir = create_output_folder()
+    logger.info(f"Output folder for this run: {output_dir}")
+
     # Load model and data
     model, class_names = load_model(args.model, device)
     data_loader, dataset_classes = create_data_loader(args.test_dir)
@@ -412,36 +425,98 @@ def main():
         )
     )
 
-    # Print results
-    logger.info("\nPer-class Results:")
+    # Samla alla true/predicted labels för confusion matrix
+    y_true = []
+    y_pred = []
+    for i, (img_path, true_label, pred_label) in enumerate(misclassified):
+        y_true.append(class_names.index(true_label))
+        y_pred.append(class_names.index(pred_label))
+    # Lägg till korrekt klassificerade också
     for class_name in class_names:
-        accuracy = (correct_per_class[class_name] / total_per_class[class_name]) * 100
-        logger.info(
-            f"{class_name}: {accuracy:.2f}% ({correct_per_class[class_name]}/{total_per_class[class_name]})"
+        n_correct = correct_per_class[class_name]
+        y_true.extend([class_names.index(class_name)] * n_correct)
+        y_pred.extend([class_names.index(class_name)] * n_correct)
+
+    # Plotta och spara confusion matrix (VG-version)
+    cm_path = output_dir / "confusion_matrix_vg.png"
+    plot_confusion_matrix_vg(y_true, y_pred, class_names, str(cm_path))
+    logger.info(f"VG confusion matrix saved to: {cm_path}")
+
+    # --- VISUELL UTVÄRDERING & SUMMERING ---
+    # 1. Hämta paths till alla testbilder och deras prediktioner
+    all_samples = list(data_loader.dataset.samples)
+    pred_labels = []
+    true_labels = []
+    img_paths = []
+    idx = 0
+    for class_idx, class_name in enumerate(class_names):
+        n_total = total_per_class[class_name]
+        n_correct = correct_per_class[class_name]
+        for i in range(n_total):
+            img_path, true_class = all_samples[idx]
+            img_paths.append(img_path)
+            true_labels.append(class_name)
+            if n_correct > 0:
+                pred_labels.append(class_name)
+                n_correct -= 1
+            else:
+                # Leta upp felklassificering för denna klass
+                for m in misclassified:
+                    if m[1] == class_name:
+                        pred_labels.append(m[2])
+                        break
+            idx += 1
+
+    # 2. Skapa listor för rätt/fel exempel (med variation mellan klasser)
+    correct_examples = []
+    incorrect_examples = []
+    for i, (img_path, true_label, pred_label) in enumerate(
+        zip(img_paths, true_labels, pred_labels)
+    ):
+        if true_label == pred_label and len(correct_examples) < 6:
+            correct_examples.append((img_path, pred_label))
+        elif true_label != pred_label and len(incorrect_examples) < 6:
+            incorrect_examples.append((img_path, pred_label, true_label))
+        if len(correct_examples) >= 6 and len(incorrect_examples) >= 6:
+            break
+
+    # 3. Plotta rätt/fel exempel
+    fig, axes = plt.subplots(2, 6, figsize=(18, 6))
+    for i, (img_path, pred_label) in enumerate(correct_examples):
+        img = Image.open(img_path).convert("L")
+        axes[0, i].imshow(img, cmap="gray")
+        axes[0, i].set_title(f"✓ Pred: {pred_label}", color="green")
+        axes[0, i].axis("off")
+    for i, (img_path, pred_label, true_label) in enumerate(incorrect_examples):
+        img = Image.open(img_path).convert("L")
+        axes[1, i].imshow(img, cmap="gray")
+        axes[1, i].set_title(f"✗ Pred: {pred_label}\nTrue: {true_label}", color="red")
+        axes[1, i].axis("off")
+    axes[0, 0].set_ylabel("Korrekt", fontsize=14)
+    axes[1, 0].set_ylabel("Fel", fontsize=14)
+    plt.tight_layout()
+    plt.savefig(output_dir / "correct_vs_incorrect.png")
+    plt.close()
+
+    # 4. Spara summary.txt
+    summary_path = output_dir / "summary.txt"
+    with open(summary_path, "w") as f:
+        f.write(f"Total testbilder: {sum(total_per_class.values())}\n")
+        f.write(f"Korrekt: {sum(correct_per_class.values())}\n")
+        f.write(
+            f"Felaktiga: {sum(total_per_class.values()) - sum(correct_per_class.values())}\n"
         )
-
-    total_correct = sum(correct_per_class.values())
-    total_samples = sum(total_per_class.values())
-    overall_accuracy = (total_correct / total_samples) * 100
-    logger.info(f"\nOverall Accuracy: {overall_accuracy:.2f}%")
-
-    if args.confidence_analysis and analysis_results.get("confidence"):
-        conf = analysis_results["confidence"]
-        logger.info("\nConfidence Analysis:")
-        logger.info(f"Mean confidence: {conf['mean']:.2f}")
-        logger.info(f"Min confidence: {conf['min']:.2f}")
-        logger.info(f"Max confidence: {conf['max']:.2f}")
-        logger.info(f"Std confidence: {conf['std']:.2f}")
-        logger.info(
-            "Confidence distribution plot saved to results/confidence_distribution.png"
+        f.write(
+            f"Overall accuracy: {(sum(correct_per_class.values()) / sum(total_per_class.values())) * 100:.2f}%\n\n"
         )
+        for class_name in class_names:
+            acc = (correct_per_class[class_name] / total_per_class[class_name]) * 100
+            f.write(
+                f"{class_name}: {acc:.2f}% ({correct_per_class[class_name]}/{total_per_class[class_name]})\n"
+            )
+    logger.info(f"Summary sparad till: {summary_path}")
 
-    if args.stress_test and analysis_results.get("stress_test"):
-        stress = analysis_results["stress_test"]
-        logger.info("\nStress Test Results:")
-        logger.info(f"Noise test accuracy: {stress['noise']:.2f}%")
-        logger.info(f"Blur test accuracy: {stress['blur']:.2f}%")
-        logger.info(f"Rotation test accuracy: {stress['rotation']:.2f}%")
+    print(f"\n📊 Visualisering + summary sparad i {output_dir}\n")
 
 
 if __name__ == "__main__":
