@@ -217,14 +217,14 @@ Our technical choices are optimized for industrial deployment, with a focus on c
 
 #### Latest real-world evaluation (June 2025)
 
-| Class     | Accuracy  |
-| --------- | --------- |
-| Fork      | 40.0%     |
-| Knife     | 66.7%     |
-| Spoon     | 91.7%     |
-| **Total** | **66.1%** |
+| Class     | Accuracy  | Precision | Recall    | F1-Score  |
+| --------- | --------- | --------- | --------- | --------- |
+| Fork      | 40.0%     | 0.615     | 0.400     | 0.485     |
+| Knife     | 66.7%     | 0.597     | 0.667     | 0.630     |
+| Spoon     | 91.7%     | 0.743     | 0.917     | 0.821     |
+| **Total** | **66.1%** | **0.652** | **0.661** | **0.645** |
 
-_This reflects the model's performance on a realistic, challenging test set. The drop from 100% (controlled) to 66% (realistic) is expected and highlights the need for more diverse training data for "fork" in particular._
+_This reflects the model's performance on a realistic, challenging test set with 180 images. The drop from 100% (controlled) to 66% (realistic) is expected and highlights the need for more diverse training data for "fork" in particular. See the [detailed analysis](results/evaluation/real_world_metrics.md) for a full statistical breakdown._
 
 ### GradCAM Visualization Examples
 

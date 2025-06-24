@@ -83,6 +83,7 @@ data/*
 # Project specific - Results and Logs
 results/*
 !results/plots/
+!results/evaluation/
 logs/
 wandb/
 mlruns/
@@ -98,51 +99,20 @@ docs/*
 demo_images/*
 !demo_images/grad_cam/
 
-# Results and temporary files
-results/*
-!results/plots/
-logs/
-wandb/
-mlruns/
-.tensorboard/
-*.log
-
-# Testing and coverage
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
-
-# OS specific
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Keep specific documentation
-!docs/test_report_template.md
-!docs/fotograferingsguide.md
+# Archive and backup directories
+FINAL_DELIVERY_V2_BACKUP/
+FINAL_DELIVERY/
+FINAL_DELIVERY_VG/
+archive/
+scripts/archive/
+results/archive/
+tests/old_src/
 
 # Distribution / packaging
 *.manifest
 *.spec
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Keep original delivery files
-!FINAL_DELIVERY_V2/
-!README_FINAL_DELIVERY.md
 
 # Project specific
 *.pth
@@ -164,6 +134,7 @@ test_images/
 results/*
 !results/grad_cam/
 !results/confusion_matrices/
+!results/evaluation/
 models/exports/
 logs/
 wandb/
@@ -191,11 +162,6 @@ mlruns/
 # Optuna files
 results/optuna_study.db
 results/optuna_plots/
-
-# Archive directories
-scripts/archive/
-results/archive/
-tests/old_src/
 
 # Generated outputs
 results/grad_cam/
