@@ -1,357 +1,208 @@
-# Cutlery Classifier MVP 🍴
+## Cutlery Classifier MVP — README v2 (systems-first)
 
-_Cutlery Classifier MVP automates industrial cutlery sorting, eliminating manual labor costs while achieving 100% accuracy on controlled test set, 66.1% accuracy on realistic challenge set._
+An **offline inference MVP** for a cutlery type classifier (fork/knife/spoon), packaged as a Python library + scripts. This repo is written as an **Edge AI Systems Engineering case study** with a clear roadmap toward a Raspberry Pi + camera deployment.
 
-> **Note:** The difference in accuracy is due to the model being evaluated on a much more challenging, realistic dataset with difficult lighting, angles, and occlusions. This is expected in real-world ML and demonstrates the MVP's strengths and limitations.
+### Executive Summary (1 screen)
+- **What the system does**: classifies a single image of cutlery into one of three classes: `fork`, `knife`, `spoon`.
+- **Current MVP scope**: offline, file-based inference + offline test-set evaluation + model export to ONNX/TorchScript (export only).
+- **Target hardware (roadmap)**: Raspberry Pi (CPU) + camera, with **ONNX Runtime** as the baseline inference engine.
+- **Key constraints (edge)**:
+  - **Latency**: end-to-end (capture → preprocess → inference → decision → actuate) must be measured, not assumed.
+  - **Preprocessing parity**: training/inference transforms must be identical across PyTorch and ONNXRuntime.
+  - **Decision robustness**: edge deployments need an explicit reject/unknown policy, not just `argmax`.
+  - **Operational readiness**: logging, watchdog behavior, and safe actuator defaults are required for credible industrial stories.
 
-![Confusion Matrix](outputs/run_20250614_143611/confusion_matrix_vg.png)
-
-## What is this project?
-
-**Cutlery Classifier MVP** is a high-performance computer vision system designed for industrial cutlery sorting machines. It performs real-time classification of kitchen utensils (forks, knives, spoons) with 100% accuracy on controlled test set, and 66.1% accuracy on a realistic challenge set.
-
-The system is optimized for industrial deployment using Raspberry Pi and Global Shutter camera integration. While achieving ultra-fast inference (25-35ms) on CUDA devices during development, the production architecture has been validated for Raspberry Pi deployment.
-
-## At a Glance
-
-✅ 100% classification accuracy on controlled test set, 66.1% on realistic challenge set  
-✅ Fast inference (25-35ms on CUDA), Raspberry Pi optimization in progress  
-✅ Production-ready preprocessing pipeline  
-✅ Raspberry Pi deployment architecture validated  
-✅ GradCAM explainability for quality assurance  
-✅ Comprehensive test suite
-
-## Features
-
-- **Production Performance**:
-
-  - 100% accuracy on validation and controlled test sets
-  - 25-35ms inference time per image (RTX GPU)
-  - Production pipeline validated with industrial cameras
-
-- **Industrial Pipeline**:
-
-  - Standardized preprocessing chain
-  - Global Shutter camera integration
-  - Real-time processing optimization
-
-- **Edge Deployment**:
-
-  - Raspberry Pi deployment in progress
-  - Industrial camera integration
-  - Optimized memory footprint
-
-- **Quality Assurance**:
-  - GradCAM visualization for every prediction
-  - Comprehensive error analysis
-  - Industrial standard testing
+---
 
 ## System Architecture
 
-```mermaid
-graph TD
-    A[Global Shutter Camera] --> B[Preprocessing Chain]
-    B --> C[ResNet18 Backbone]
-    C --> D[Classification Head]
-    D --> E[Class Prediction]
-    B --> F[GradCAM Module]
-    C --> F
-    F --> G[Quality Visualization]
+The intended deployment pipeline is:
 
-    subgraph Preprocessing Chain
-        H[Grayscale] --> I[Resize 320x320]
-        I --> J[Center Crop 224x224]
-        J --> K[Normalize]
-    end
+```
+              (PLANNED)                 (EXISTS)                 (PLANNED)
+Camera/Driver ────────> Preprocess ────> Model Runner ────> Decision Policy ────> Actuation
+   [missing]            [exists for files]  [PyTorch exists]      [not wired]       [missing]
+                                              [ONNX export only]
 ```
 
-## Pipeline Rationale
+### Dataflow: Camera → Preprocess → Model → Decision → Actuation
+- **Camera**: not implemented (no capture loop / camera driver integration in repo).
+- **Preprocess**: implemented for offline image files (torchvision transforms).
+- **Model**: implemented for PyTorch checkpoint inference; ONNX export exists (runtime runner not implemented).
+- **Decision**: planned (reject/margin policy not integrated into runtime inference).
+- **Actuation**: not implemented (no GPIO/PLC/serial interface).
 
-Our technical choices are optimized for industrial deployment, with a focus on consistency between development and production:
+---
 
-- **Preprocessing Pipeline** (identical in development and production):
+## Current Implementation (What Exists)
 
-  - **Grayscale Conversion**:
-    - Reduces input complexity
-    - More robust to lighting variations
-    - 3x smaller memory footprint
-    - Matches Global Shutter output
-  - **Resize to 320x320**:
-    - Preserves aspect ratio
-    - Maintains fine details
-    - Standardizes industrial camera input
-  - **Center Crop to 224x224**:
-    - ResNet18 optimal input size
-    - Ensures transfer learning efficiency
-    - Consistent between development and production
-    - Critical for real-time performance
-  - **Normalization**:
-    - Industrial camera calibration (μ=0.5, σ=0.5)
-    - Consistent feature scaling
-    - Validated with Global Shutter output
+### Offline inference
+- **Primary implementation**: `CutleryInferencer` in `src/cutlery_classifier/inference/inferencer.py`
+  - Loads a checkpoint containing `config` + `class_names` + `model_state_dict`.
+  - Runs preprocessing + model forward pass.
+  - Returns top-k softmax probabilities and a measured `inference_time_ms` (see Performance notes).
 
-- **Model Architecture**:
+### Model + preprocessing
+- **Model factory**: `src/cutlery_classifier/models/factory.py`
+  - Supports `resnet18` and `mobilenet_v2`.
+  - Can adapt pretrained RGB weights to grayscale by reducing/averaging first-layer weights.
+- **Transforms**: `src/cutlery_classifier/data/transforms.py`
+  - Provides a consistent “base transform” for test/inference (detailed below).
 
-  - **ResNet18 Backbone**:
-    - Optimal speed/accuracy trade-off
-    - Proven industrial reliability
-    - Validated for Raspberry Pi deployment
-  - **Transfer Learning**:
-    - ImageNet pre-training leverage
-    - Faster convergence
-    - Reduced data requirements
-    - 224x224 input maintains pretrained weights efficiency
+### Evaluation setup
+- `scripts/evaluate_on_test_set.py`:
+  - Runs file-based inference over a directory-structured test set and writes:
+    - `results/evaluation/confusion_matrix.png`
+    - `results/evaluation/metrics.json`
+- `scripts/test_dataset_inference.py`:
+  - Alternative evaluation script that also generates run artifacts in `outputs/run_<timestamp>/`
+  - Includes optional confidence analysis and stress tests (offline, not edge-integrated).
 
-- **Production Integration**:
+---
 
-  - **Global Shutter Integration**:
-    - Direct camera feed processing
-    - Real-time capture pipeline
-    - Industrial lighting adaptation
-  - **Raspberry Pi Optimization**:
-    - Memory-efficient processing
-    - Pipeline timing validation
-    - Hardware-specific tuning
+## Edge Runtime Roadmap (Not Yet Implemented)
 
-- **Quality Assurance**:
-  - **GradCAM Integration**:
-    - Real-time attention visualization
-    - Production prediction verification
-    - Error root cause analysis
-  - **ONNX Export** (Status):
-    - Export pipeline implemented
-    - Runtime testing on Raspberry Pi in progress
-    - Production deployment guide in development
+To make this an actual edge system (Pi + camera + actuator), the repo still needs:
+- **Camera capture loop**
+  - A frame acquisition module (e.g., V4L2/libcamera/OpenCV) with buffering and dropped-frame policy.
+- **ONNXRuntime runner**
+  - A runtime that loads the exported `.onnx` model and matches PyTorch preprocessing exactly.
+  - Threading controls and benchmarking on ARM CPU.
+- **Decision policy integration (reject / margin)**
+  - Runtime wiring of confidence/margin gating and a clear “reject” output behavior.
+- **Actuator interface**
+  - A hardware abstraction for “sort left/right/reject” (GPIO/serial/PLC), including a safe default.
+- **End-to-end latency measurement**
+  - Measure: capture time + preprocess + inference + decision + actuator command (and jitter under load).
 
-## Training & Evaluation
+---
 
-### Dataset Composition
+## Preprocessing (Single Source of Truth)
 
-- **Original Images**:
+The offline inference path uses the base transforms from `src/cutlery_classifier/data/transforms.py`:
 
-  - 60 base images (10 per item × 3 types × 2 manufacturers)
-  - Controlled lighting conditions
-  - Professional photography setup
-  - Multiple manufacturers (A and B) for robustness
-  - Total ~240 images after augmentation
+- **Resize**: to `image_size` (default `[320, 320]` from config; commonly 320×320 in this repo)
+- **Grayscale**: `num_output_channels=1`
+- **ToTensor**: torchvision conversion to `torch.Tensor`
+- **Normalize**: custom grayscale normalization using ImageNet-averaged stats
+  - **mean**: `0.449`
+  - **std**: `0.226`
 
-- **Challenge Cases**:
+Important notes:
+- The current README v1 stated a **center crop to 224×224**. That is **not implemented** in the base transforms.
+- There are multiple scripts with their own transforms; for deployment credibility, the project should converge on **one** preprocessing definition and reuse it everywhere (PyTorch + ONNXRuntime).
 
-  - 40 additional test images:
-    - Side-view orientations
-    - Upside-down positions
-    - Partial occlusions
-    - Mixed orientations
-  - These were used exclusively for testing and not seen during training.
-  - High accuracy achieved on challenge set
-  - GradCAM verified correct feature focus
-  - Validates real-world robustness
+---
 
-- **Data Split**:
-  - Training: 70% of base images
-  - Validation: 15% of base images
-  - Test: 15% of base images + 40 challenge cases
-  - Challenge cases used only for testing
+## Decision Policy (Planned)
 
-### Data Augmentation
+Edge deployments usually require a decision policy beyond `argmax`, for example:
+- **Reject / unknown** when top-1 confidence is below a threshold
+- **Margin gating** when top-1 minus top-2 is too small (ambiguous)
+- **Temporal confirmation** across multiple frames before actuating
 
-- **Real-time Augmentation** (during training):
+Status in this repo:
+- The main runtime inference returns probabilities but **does not apply a reject policy**.
+- There is analysis-oriented code (e.g., confidence statistics) in evaluation modules, but it is **not wired** into a deployable runtime loop.
 
-  - Rotation: ±30 degrees
-  - Scale: ±20%
-  - Brightness: ±30%
-  - Gaussian noise: σ=0.01
-  - ~3 augmented variants per original image
+---
 
-- **Preprocessing Pipeline**:
+## Performance
 
-  - Grayscale conversion
-  - Resize to 320×320
-  - Center crop to 224×224
-  - Normalization (μ=0.5, σ=0.5)
+### What is measured today
+- `CutleryInferencer.predict()` returns `inference_time_ms` measured around:
+  - preprocessing + model forward pass + postprocessing in Python.
 
-- **Quality Assurance**:
-  - Manual verification of augmented images
-  - Balanced class distribution
-  - Manufacturer diversity
-  - Orientation variety
+### What is *not* measured yet (edge-relevant)
+- **End-to-end** timing including camera capture and actuation.
+- **Raspberry Pi CPU** benchmarks.
+- **ONNXRuntime** inference latency on ARM CPU.
+- **Deterministic measurement method** (e.g., CUDA synchronization for GPU measurements).
 
-### Industrial Considerations
+### Target platform placeholders (to be filled with real numbers)
+| Metric | Raspberry Pi (CPU) | Notes |
+|---|---:|---|
+| Model-only inference latency (ms) | TBD | ONNXRuntime, batch=1 |
+| Preprocess latency (ms) | TBD | resize + grayscale + normalize |
+| End-to-end latency (ms) | TBD | capture→actuate |
+| Sustained FPS @ thermal steady state | TBD | includes throttling |
 
-- **Data Collection Protocol**:
+---
 
-  - Controlled lighting environment
-  - Multiple camera angles
-  - Two different manufacturers
-  - Production-like conditions
-
-- **Robustness Testing**:
-  - Challenge cases for stress testing
-  - Multi-manufacturer validation
-  - Lighting variation tolerance
-  - Position invariance verification
-
-### Training Strategy
-
-- **Base Model**: ResNet18 (ImageNet pretrained)
-- **Fine-tuning**:
-  - Stage 1: Frozen backbone (10 epochs)
-  - Stage 2: Full model (40 epochs)
-- **Hyperparameters**:
-  - Optimizer: Adam
-  - Learning Rate: 0.001
-  - Batch Size: 32
-  - Weight Decay: 1e-4
-- **Input Pipeline**:
-  - Size: 224x224
-  - Color: Grayscale
-  - Normalization: μ=0.5, σ=0.5
-
-### Training Curves
-
-![Training Accuracy](results/plots/training_accuracy.png)
-
-### Model Performance
-
-![Confusion Matrix](outputs/run_20250614_143611/confusion_matrix_vg.png)
-
-#### Latest real-world evaluation (June 2025)
-
-| Class     | Accuracy  | Precision | Recall    | F1-Score  |
-| --------- | --------- | --------- | --------- | --------- |
-| Fork      | 40.0%     | 0.615     | 0.400     | 0.485     |
-| Knife     | 66.7%     | 0.597     | 0.667     | 0.630     |
-| Spoon     | 91.7%     | 0.743     | 0.917     | 0.821     |
-| **Total** | **66.1%** | **0.652** | **0.661** | **0.645** |
-
-_This reflects the model's performance on a realistic, challenging test set with 180 images. The drop from 100% (controlled) to 66% (realistic) is expected and highlights the need for more diverse training data for "fork" in particular. See the [detailed analysis](results/evaluation/real_world_metrics.md) for a full statistical breakdown._
-
-### GradCAM Visualization Examples
-
-![GradCAM Example](demo_images/grad_cam/fork_20250605_175137.jpg)
-
-### Best Model Selection
-
-The production model (`models/checkpoints/type_detector_finetuned.pth`) is used for all current evaluations and deployment. The previous model (`type_detector_best.pth`) is retained for historical RTX 5090 benchmarks and reference only.
-
-## How to Run
+## Reproducible Run
 
 ### Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/olablom/cutlery-classifier-mvp.git
-cd cutlery-classifier-mvp
-
-# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/macOS
+# or: .\venv\Scripts\activate  # Windows
 
-# Install package in development mode (includes all dependencies)
 pip install -e .
 ```
 
-### Inference
+### Offline single-image inference (PyTorch checkpoint)
 
-**Option 1: Using original scripts (works after pip install -e .)**
-
-```bash
-# Single image inference
-python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_finetuned.pth
-
-# Full test dataset evaluation
-python scripts/test_dataset_inference.py --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_finetuned.pth
-
-# Generate GradCAM visualization
-python scripts/run_inference.py --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_finetuned.pth --grad-cam
-```
-
-**Option 2: Using console commands (after pip install -e .)**
+This uses the packaged entrypoint that forwards to `scripts/run_inference.py`:
 
 ```bash
-# Single image inference
-cutlery-inference --device cpu --image demo_images/grad_cam/knife_20250605_223142.jpg --model models/checkpoints/type_detector_finetuned.pth
-
-# Full test dataset evaluation
-cutlery-test --device cpu --test_dir data/simplified/test --model models/checkpoints/type_detector_finetuned.pth
-
-# Training
-cutlery-train --device cpu --epochs 20 --batch-size 16
+cutlery-inference --device cpu --image <path/to/image.jpg> --model <path/to/checkpoint.pth>
 ```
 
-## Limitations & Future Work
+Notes:
+- A compatible checkpoint must contain `config`, `class_names`, and `model_state_dict` (see `CutleryInferencer.load_model()`).
+- If you don’t have the checkpoint and dataset folders locally, the commands will fail (this repo does not guarantee those artifacts are present).
 
-### Current Status
+### Offline evaluation on a directory-structured test set
 
-- **Production Architecture**:
-
-  - Raspberry Pi deployment architecture validated
-  - Global Shutter camera integration designed
-  - Real-time inference pipeline tested
-  - ONNX export functionality implemented
-
-- **Next Steps**:
-  - Complete Raspberry Pi performance profiling
-  - Finalize Global Shutter camera calibration
-  - Production environment stress testing
-  - ONNX runtime optimization
-
-## Project Structure
-
+```bash
+python scripts/evaluate_on_test_set.py \
+  --device cpu \
+  --model <path/to/checkpoint.pth> \
+  --test-dir <path/to/test_dir>
 ```
-cutlery-classifier-mvp/
-├── config/           # Configuration files
-├── data/            # Dataset directory
-│   └── simplified/  # Processed dataset
-├── demo_images/     # Example images and GradCAM visualizations
-├── models/          # Trained model checkpoints
-├── results/         # Evaluation results and plots
-├── scripts/         # Production scripts
-├── src/            # Source code
-│   └── cutlery_classifier/ # Main package
-└── tests/          # Test suite
-```
+
+Outputs (relative to repo root):
+- `results/evaluation/metrics.json`
+- `results/evaluation/confusion_matrix.png`
 
 ---
 
-## **RTX 5090 Benchmark & Validation Results** (June 2025)
+## Training Notes (short)
 
-### **Performance Verification**
+Training is implemented but not the focus of this README.
+- Config examples live in `config/` (e.g., `config/train_config.yaml`).
+- The training pipeline code is under `src/cutlery_classifier/training/`.
+- Hyperparameter tuning scripts exist under `scripts/` (e.g., Optuna-related tooling).
 
-The production pipeline has been **validated on RTX 5090** hardware with comprehensive benchmarking (using the previous model `type_detector_best.pth`):
-
-| Metric             | Target | Achieved    | Result         |
-| ------------------ | ------ | ----------- | -------------- |
-| **Inference Time** | <50ms  | **1.99ms**  | **25x faster** |
-| **Accuracy**       | >95%   | **100%**    | **Perfect**    |
-| **Stress Testing** | Robust | **90-100%** | **Validated**  |
-
-### **Latest Results & Artifacts**
-
-- **[Performance Benchmark Report](results/production_validation/benchmark_rtx5090.txt)** - Detailed RTX 5090 metrics
-- **[Grad-CAM Visualizations](results/grad_cam/)** - Model explainability examples
-- **[Training Curves](results/plots/)** - Loss/accuracy progression plots
-- **[Confusion Matrix](outputs/run_20250614_143611/confusion_matrix_vg.png)** - Latest real-world evaluation
-
-### **Hardware Specifications**
-
-- **GPU**: NVIDIA GeForce RTX 5090 (34.2GB VRAM)
-- **CUDA**: sm_120 architecture with PyTorch 2.8.0+cu128
-- **Optimization**: Optuna hyperparameter tuning achieving 100% validation accuracy
-
-### **Production Readiness**
-
-**VALIDATED FOR DEPLOYMENT** - System exceeds all industrial requirements with significant performance headroom.
-
-_RTX 5090 optimization complete: 1.99ms inference (25x faster than specification) with perfect accuracy_
+For a portfolio-quality edge story, training details should move into `docs/training.md` and the README should stay focused on **system behavior and deployability**.
 
 ---
 
-## License & Author
+## Known Gaps / Risks
 
-**Author**: Ola Blom  
-**License**: MIT License
+- **Missing camera loop**: no capture pipeline, buffering strategy, or camera configuration.
+- **Missing actuator integration**: no interface for a sorter mechanism (GPIO/PLC/serial) and no safe-state behavior.
+- **Reject policy not integrated**: probabilities are produced but not converted into an auditable accept/reject decision.
+- **Preprocessing parity risk**: multiple scripts define transforms; edge/ONNX must match the single canonical preprocessing.
+- **Dependency bloat for edge**: dev tooling (plots/Grad-CAM/Optuna) is mixed into core install requirements; edge deploy should be slim.
+- **Packaging inconsistencies**: multiple dependency specs and versions (`requirements.txt`, `pyproject.toml`, `setup.py`) disagree.
+- **Reproducibility risk**: tests and scripts reference data/model artifacts that may not be in the repo by default.
 
-© 2025 Ola Blom. All rights reserved.
+---
+
+## Next Engineering Steps
+
+Concrete TODOs to turn this into an edge deployment:
+- Define a deployable module boundary: `camera`, `preprocess`, `runner`, `policy`, `actuator`, `app`.
+- Add an ONNXRuntime inference runner and verify preprocessing parity vs PyTorch on a fixed test vector.
+- Implement a decision policy (confidence + margin + temporal voting) and log decisions with reasons.
+- Add an end-to-end benchmark harness for Pi CPU (including thermal steady state and jitter).
+- Create an edge-oriented dependency profile (minimal runtime requirements).
+- Add a system-level runbook: “bring-up on Pi”, service install, logging locations, and health checks.
+
+---
+
+## License
+
+MIT License (see `LICENSE`).
