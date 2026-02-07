@@ -378,3 +378,6 @@ ENV/
 data/raw/*.jpg
 data/augmented/*.jpg
 !data/raw/sample_*.jpg  # Keep sample files for demo 
+# build / editable metadata
+*.egg-info/
+src/*.egg-info/

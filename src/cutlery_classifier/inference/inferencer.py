@@ -18,7 +18,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-import cv2
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Union
 import logging

@@ -8,10 +8,10 @@ version = "3.0.0"
 authors = [
     { name="Ola Blom", email="ola.blom@example.com" },
 ]
-description = "Production-grade cutlery classifier with RTX 5090 optimization (1.99ms inference)"
+description = "Offline inference MVP for cutlery classification (fork/knife/spoon)."
 readme = "README.md"
 requires-python = ">=3.8"
-keywords = ["machine learning", "computer vision", "cutlery", "classification", "rtx5090", "cuda", "pytorch"]
+keywords = ["machine learning", "computer vision", "cutlery", "classification", "edge-ai", "pytorch"]
 license = { file = "LICENSE" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -30,18 +30,11 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "torch>=2.6.0",
-    "torchvision>=0.17.0", 
+    "torch>=2.3.0",
+    "torchvision>=0.18.0",
     "pillow>=8.3.0",
     "numpy>=1.21.0",
-    "matplotlib>=3.4.0",
-    "grad-cam>=1.4.0",
     "onnx>=1.12.0",
-    "onnxruntime-gpu>=1.12.0",
-    "plotly>=5.0.0",
-    "kaleido>=0.2.1",
-    "optuna>=3.0.0",
-    "click>=8.0.0",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +44,19 @@ dev = [
     "black>=22.0.0",
     "flake8>=5.0.0",
     "mypy>=1.0.0",
+]
+eval = [
+    "scikit-learn>=1.6.0",
+    "matplotlib>=3.4.0",
+    "seaborn>=0.13.0",
+    "tqdm>=4.60.0",
+    "pandas>=2.0.0",
+]
+gradcam = [
+    "grad-cam>=1.4.0",
+]
+export = [
+    "onnxruntime>=1.12.0",
 ]
 # rtx5090 = [
 #   "torch>=2.8.0.dev20250610+cu128"
