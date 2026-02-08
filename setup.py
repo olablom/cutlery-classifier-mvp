@@ -18,8 +18,8 @@ setup(
     entry_points={
         "console_scripts": [
             "cutlery-inference=cutlery_classifier.scripts.run_inference:main",
-            "cutlery-test=cutlery_classifier.scripts.test_dataset_inference:main",
-            "cutlery-train=cutlery_classifier.scripts.train_type_detector:main",
+            "cutlery-test=cutlery_classifier.scripts.dev_test_shim:main",
+            "cutlery-train=cutlery_classifier.scripts.dev_train_shim:main",
         ],
     },
     python_requires=">=3.8",
