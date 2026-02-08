@@ -381,3 +381,13 @@ data/augmented/*.jpg
 # build / editable metadata
 *.egg-info/
 src/*.egg-info/
+
+# --- runtime artifacts / local-only ---
+outputs/
+results/
+data/
+venv/
+.pytest_cache/
+FINAL_DELIVERY_*/
+archive/
+artifacts/
