@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-Console script entry point for training (dev tool).
-
-Training is intentionally out-of-scope for the offline inference MVP runtime.
-This entrypoint remains as a shim so existing installs don't break.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -13,28 +6,34 @@ import sys
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    return argparse.ArgumentParser(
-        description="Dev-only training entrypoint (not part of offline inference MVP)."
+    p = argparse.ArgumentParser(
+        prog="cutlery-train",
+        description="Dev-only tool (not part of offline inference MVP runtime).",
     )
+    p.add_argument(
+        "--info",
+        action="store_true",
+        help="Print how to run the legacy dev script.",
+    )
+    return p
 
 
 def main(argv: list[str] | None = None) -> None:
-    _build_parser().parse_args(argv)
+    args = _build_parser().parse_args(argv)
 
-    try:
-        from scripts.train_type_detector import main as legacy_main  # type: ignore
+    msg = (
+        "cutlery-train is dev-only and not part of the offline inference MVP runtime.\n"
+        "Use the legacy script instead:\n"
+        "  python legacy/dev/scripts/train_type_detector.py ...\n"
+    )
 
-    except Exception as e:
-        print(
-            "cutlery-train is a dev tool and is not part of the offline inference MVP runtime.\n"
-            "If you want to train, use `python scripts/train_type_detector.py ...` in the repo\n"
-            "and install the dev dependencies.\n"
-            f"\nImport error: {e}",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
+    if args.info:
+        print(msg)
+        return
 
-    legacy_main()
+    # For any non-help invocation: treat as dev-only command.
+    print(msg, file=sys.stderr)
+    raise SystemExit(2)
 
 
 if __name__ == "__main__":
